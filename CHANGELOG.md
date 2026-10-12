@@ -1,5 +1,15 @@
 # Changelog
 
+## v2026.10.12.2
+
+- **Every control is now in a collapsible section** (collapsed by default) so nothing changes by accident: Aspect, Remote, Source (inputs + memory), Picture (CMS + Style), Admin & link. Status stays on top. Each collapsed header shows the current value (e.g. "Aspect 2.40 · auto").
+- **Order:** status (signal chain, tags, visualizer, HDR), then Aspect and Remote (the most used), then Source, Picture, Admin.
+- **Visualizer shows a real picture** cropped and stretched exactly as the Lumagen does: the region the Lumagen is set to is stretched into the output area on your screen, so a wrong aspect setting shows the true crop or bars. Built-in landscape, or your own picture (`scene_image`). A centered caption under each screen ("Content 2.40 · Output 2.40 on 2.40 screen").
+- **Option: show only the result screen** (`viz_after_only`).
+- **Appearance:** sizes and four-mode (theme / custom / CSS) colors for the card background and border, boxes, header icon / title / summary, section headers, subtitles, values, details text, chips, icons and the visualizer (`styles:`).
+- **Custom icons** for the header (power button) and every section — type just the MDI name, `mdi:` is added (`icons:`).
+- Uses the detected content aspect when available, so a manual aspect override is shown against the real picture.
+
 ## v2026.10.12.1
 
 First release.

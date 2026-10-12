@@ -1,17 +1,18 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.12.1
+// Version: v2026.10.12.2
 //
-// Signal chain (source → Lumagen → display), an aspect visualizer drawn from the
-// live ratios, HDR details, one-tap chips for input / memory / aspect / CMS /
-// style, a menu remote and an admin drawer — for the `lumagen` integration
-// (github.com/Ltek/lumagen; the base features also work with jaysoffian/ha-lumagen).
+// Read-only status on top (signal chain, tags, an aspect visualizer that crops and
+// stretches a real picture exactly like the Lumagen does, HDR details); every
+// control lives in a collapsed section (Aspect, Remote, Source, Picture, Admin) so
+// nothing changes by accident. For the `lumagen` integration (github.com/Ltek/lumagen;
+// base features also work with jaysoffian/ha-lumagen).
 //
-// Vanilla JS, single file, light DOM. The card stylesheet is a constant (no
-// config values interpolated); per-card values are custom properties set inline
-// on the card root. Entities are found by the integration's translation keys,
-// so renamed entity IDs keep working; disabled entities simply don't appear.
+// Vanilla JS, single file, light DOM. The card stylesheet is a constant (no config
+// values interpolated); per-card values are custom properties set inline on the
+// card root. Entities are found by the integration's translation keys, so renamed
+// entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.12.1';
+const BUILD_NUMBER = 'v2026.10.12.2';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -43,6 +44,7 @@ const ENTITY_KEYS = {
   src_3d: ['sensor', 'source_3d_mode', 'source_3d_mode'],
   src_raster: ['sensor', 'source_raster_aspect', 'source_raster_aspect_ratio'],
   src_content: ['sensor', 'source_content_aspect', 'source_content_aspect_ratio'],
+  det_content: ['sensor', 'detected_content_aspect', 'detected_content_aspect_ratio'],
   nls: ['sensor', 'nls', 'nls'],
   out_res: ['sensor', 'output_vertical_resolution', 'output_resolution'],
   out_rate: ['sensor', 'output_vertical_rate', 'output_refresh_rate'],
@@ -109,14 +111,16 @@ const DEFAULTS = {
   show_when_off: true,
   display_name: 'Display',
   display_aspect: 1.78,
+  viz_after_only: false,
+  scene_image: '',
   show_chain: true,
   show_visualizer: true,
   show_hdr: true,
+  show_aspects: true,
+  show_remote: true,
   show_inputs: true,
   show_memory: true,
-  show_aspects: true,
   show_picture: true,
-  show_remote: true,
   show_admin: true,
   accent_color: '',
   hdr_color: '',
@@ -126,13 +130,79 @@ const SECTIONS = [
   ['show_chain', 'Signal chain (source → Lumagen → display) and status tags'],
   ['show_visualizer', 'Aspect visualizer'],
   ['show_hdr', 'HDR details (when the source is HDR)'],
-  ['show_inputs', 'Input chips'],
-  ['show_memory', 'Memory A–D'],
-  ['show_aspects', 'Aspect ratio chips, NLS and Reset'],
-  ['show_picture', 'CMS and Style chips'],
-  ['show_remote', 'Menu remote (collapsed)'],
-  ['show_admin', 'Admin & link health (collapsed)'],
+  ['show_aspects', 'Aspect section'],
+  ['show_remote', 'Remote section'],
+  ['show_inputs', 'Source section: inputs'],
+  ['show_memory', 'Source section: memory A–D'],
+  ['show_picture', 'Picture section: CMS and Style'],
+  ['show_admin', 'Admin & link section'],
 ];
+
+// Icons: header (also the power button) and each collapsible section.
+const ICON_DEFAULTS = {
+  header: 'mdi:overscan',
+  aspect: 'mdi:aspect-ratio',
+  remote: 'mdi:remote',
+  source: 'mdi:video-input-hdmi',
+  picture: 'mdi:palette',
+  admin: 'mdi:tools',
+};
+const ICON_LABELS = {
+  header: 'Header (power button)', aspect: 'Aspect', remote: 'Remote', source: 'Source', picture: 'Picture', admin: 'Admin & link',
+};
+
+/** 'movie' → 'mdi:movie'; 'hass:x' / 'mdi:x' kept; '' → ''. */
+function normalizeIcon(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  return s.includes(':') ? s : `mdi:${s}`;
+}
+
+// Appearance: [key, group, kind, label, default(px for sizes | label for colors), min, max]
+const STYLE_DEFS = [
+  ['card_background', 'card', 'color', 'Background', 'Theme card background'],
+  ['card_border_color', 'card', 'color', 'Border color', 'Theme border'],
+  ['card_radius', 'card', 'size', 'Corner radius', 12, 0, 32],
+  ['card_padding', 'card', 'size', 'Padding', 12, 4, 28],
+  ['box_background', 'card', 'color', 'Box & key background', 'Subtle grey'],
+  ['header_icon_size', 'header', 'size', 'Icon size', 22, 14, 44],
+  ['header_icon_color', 'header', 'color', 'Icon color (when on)', 'Context color'],
+  ['title_size', 'header', 'size', 'Title size', 16, 11, 30],
+  ['title_color', 'header', 'color', 'Title color', 'Primary text'],
+  ['summary_size', 'header', 'size', 'Summary size', 13, 9, 22],
+  ['summary_color', 'header', 'color', 'Summary color', 'Secondary text'],
+  ['section_icon_size', 'sections', 'size', 'Icon size', 18, 12, 34],
+  ['section_icon_color', 'sections', 'color', 'Icon color', 'Context color'],
+  ['section_title_size', 'sections', 'size', 'Title size', 14, 10, 24],
+  ['section_title_color', 'sections', 'color', 'Title color', 'Primary text'],
+  ['subtitle_size', 'subtitles', 'size', 'Size', 10, 8, 18],
+  ['subtitle_color', 'subtitles', 'color', 'Color', 'Secondary text'],
+  ['text_size', 'text', 'size', 'Size', 14, 10, 26],
+  ['text_color', 'text', 'color', 'Color', 'Primary text'],
+  ['secondary_size', 'secondary', 'size', 'Size', 12, 9, 20],
+  ['secondary_color', 'secondary', 'color', 'Color', 'Secondary text'],
+  ['chip_size', 'chips', 'size', 'Text size', 13, 10, 22],
+  ['chip_color', 'chips', 'color', 'Text color', 'Primary text'],
+  ['chip_background', 'chips', 'color', 'Background', 'Transparent'],
+  ['chip_border_color', 'chips', 'color', 'Border color', 'Subtle grey'],
+  ['icon_size', 'icons', 'size', 'Size', 22, 14, 40],
+  ['icon_color', 'icons', 'color', 'Color', 'Primary text'],
+  ['viz_height', 'viz', 'size', 'Screen height', 72, 40, 180],
+  ['caption_size', 'viz', 'size', 'Caption size', 11, 8, 18],
+  ['caption_color', 'viz', 'color', 'Caption color', 'Secondary text'],
+];
+const STYLE_GROUPS = [
+  ['card', 'Card', 'Background, border and the boxes / remote keys.'],
+  ['header', 'Header', 'Icon, title and the live summary on the right.'],
+  ['sections', 'Section headers', 'The collapsible Aspect / Remote / Source / Picture / Admin rows.'],
+  ['subtitles', 'Subtitles', 'Box headings (SOURCE / LUMAGEN / DISPLAY) and row labels (Input, Memory…).'],
+  ['text', 'Values', 'Main values in the signal chain boxes.'],
+  ['secondary', 'Details text', 'Second lines, HDR details, link and notes.'],
+  ['chips', 'Chips & buttons', 'Input / aspect / CMS / admin buttons. Active chips use the context color.'],
+  ['icons', 'Icons', 'Remote key icons and the signal-chain arrows.'],
+  ['viz', 'Visualizer', 'Screen size and the caption under each screen.'],
+];
+const STYLE_INDEX = Object.fromEntries(STYLE_DEFS.map((d) => [d[0], d]));
 
 function normalizeConfig(raw) {
   const c = raw && typeof raw === 'object' ? raw : {};
@@ -144,16 +214,47 @@ function normalizeConfig(raw) {
     const d = DEFAULTS[k];
     if (typeof d === 'boolean') v = v === true || v === 'true';
     else if (typeof d === 'number') { v = Number(v); if (!Number.isFinite(v)) return; v = Math.round(v * 100) / 100; }
-    else v = String(v);
+    else v = String(v).trim();
     if (v === d) return;
     out[k] = v;
   });
-  Object.keys(c).forEach((k) => { if (!(k in out) && !(k in DEFAULTS) && k !== 'type') out[k] = c[k]; });
+  if (c.icons && typeof c.icons === 'object') {
+    const icons = {};
+    Object.keys(c.icons).forEach((k) => {
+      const v = normalizeIcon(c.icons[k]);
+      if (v && v !== ICON_DEFAULTS[k]) icons[k] = v;
+    });
+    if (Object.keys(icons).length) out.icons = icons;
+  }
+  if (c.styles && typeof c.styles === 'object') {
+    const styles = {};
+    Object.keys(c.styles).forEach((k) => {
+      const def = STYLE_INDEX[k];
+      let v = c.styles[k];
+      if (v === undefined || v === null || v === '') return;
+      if (!def) { styles[k] = v; return; } // unknown (newer build): keep verbatim
+      if (def[2] === 'size') {
+        v = Number(v);
+        if (!Number.isFinite(v) || v === def[4]) return;
+        v = Math.round(Math.min(def[6], Math.max(def[5], v)));
+        if (v === def[4]) return;
+      } else v = String(v).trim();
+      if (v !== '') styles[k] = v;
+    });
+    if (Object.keys(styles).length) out.styles = styles;
+  }
+  Object.keys(c).forEach((k) => {
+    if (!(k in out) && !(k in DEFAULTS) && !['type', 'icons', 'styles'].includes(k)) out[k] = c[k];
+  });
   return out;
 }
 
 function cfg(config, key) {
   return config[key] !== undefined ? config[key] : DEFAULTS[key];
+}
+
+function iconFor(config, key) {
+  return (config.icons && config.icons[key]) || ICON_DEFAULTS[key];
 }
 
 /** Per-card custom properties (inline on the card root; never in the stylesheet). */
@@ -162,6 +263,11 @@ function rootStyleVars(config) {
   if (config.accent_color) vars.push(`--lmg-accent:${config.accent_color}`);
   if (config.hdr_color) vars.push(`--lmg-hdr:${config.hdr_color}`);
   if (config.game_color) vars.push(`--lmg-game:${config.game_color}`);
+  const st = config.styles || {};
+  STYLE_DEFS.forEach(([key, , kind]) => {
+    if (st[key] === undefined) return;
+    vars.push(`--lmg-${key.replace(/_/g, '-')}:${st[key]}${kind === 'size' ? 'px' : ''}`);
+  });
   return vars.join(';');
 }
 
@@ -185,6 +291,27 @@ function fitRect(x, y, w, h, ar) {
   return { x: x + (w - rw) / 2, y: y + (h - rh) / 2, w: rw, h: rh };
 }
 
+/**
+ * Geometry of what the Lumagen does, in "source units" (raster height = 100).
+ *   raster   — the incoming frame (e.g. 1.78)
+ *   content  — where the real picture is inside it (detected content aspect)
+ *   selected — the region the Lumagen is told the content occupies (source aspect)
+ *   screen / image — your screen, and where the output image lands on it
+ * The output shows `selected` stretched to fill `image` (non-uniform when they differ),
+ * which is exactly how a mismatched aspect setting crops or adds bars on screen.
+ */
+function vizGeometry({ raster, content, selected, output, screen }) {
+  const W = 100 * raster;
+  const scrW = 100 * screen;
+  return {
+    source: { w: W, h: 100 },
+    content: fitRect(0, 0, W, 100, content),
+    selected: fitRect(0, 0, W, 100, selected),
+    screen: { w: scrW, h: 100 },
+    image: fitRect(0, 0, scrW, 100, output),
+  };
+}
+
 function fmtVideo(res, mode, rate) {
   if (!okState(res) || Number(res) === 0) return '—';
   return `${res}${mode === 'Interlaced' ? 'i' : 'p'}${okState(rate) && Number(rate) ? rate : ''}`;
@@ -201,34 +328,63 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+const f2 = (n) => Number(n).toFixed(2);
+
+// Built-in picture for the visualizer: a license-free landscape drawn as SVG, with
+// detail at the edges (trees) and top/bottom (sun, lake) so cropping is obvious.
+const SCENE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f6fc0"/><stop offset=".55" stop-color="#8fc0e8"/><stop offset=".72" stop-color="#f3d7a7"/></linearGradient>
+<linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6aa3cf"/><stop offset="1" stop-color="#1f4f7a"/></linearGradient></defs>
+<rect width="1600" height="900" fill="url(#s)"/>
+<circle cx="800" cy="300" r="70" fill="#fff4c9"/><circle cx="800" cy="300" r="110" fill="#fff4c9" opacity=".25"/>
+<g fill="#fff" opacity=".85"><ellipse cx="300" cy="150" rx="120" ry="28"/><ellipse cx="380" cy="135" rx="80" ry="26"/><ellipse cx="1250" cy="200" rx="140" ry="30"/><ellipse cx="1170" cy="185" rx="70" ry="22"/></g>
+<path d="M0 560 L230 380 L380 470 L560 330 L760 500 L930 360 L1120 480 L1300 340 L1600 520 L1600 620 L0 620Z" fill="#6f86a8"/>
+<path d="M0 600 L300 470 L520 560 L760 450 L1000 570 L1260 460 L1600 580 L1600 660 L0 660Z" fill="#4f6b52"/>
+<rect y="640" width="1600" height="260" fill="url(#w)"/>
+<ellipse cx="800" cy="700" rx="90" ry="10" fill="#fff4c9" opacity=".6"/>
+<path d="M0 640 C300 610 500 650 800 630 C1100 610 1300 650 1600 630 L1600 660 L0 660Z" fill="#3d5a3f"/>
+<g fill="#24402a"><path d="M60 660 L120 380 L180 660Z"/><path d="M150 660 L215 430 L280 660Z"/><path d="M1420 660 L1485 400 L1550 660Z"/><path d="M1330 660 L1385 460 L1440 660Z"/></g>
+<path d="M0 840 C400 800 1200 880 1600 830 L1600 900 L0 900Z" fill="#c9b48a"/>
+</svg>`;
+const SCENE_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SCENE_SVG)}`;
+
 // ---------------------------------------------------------------------------
 // Card stylesheet — CONSTANT (identical for every instance; see design system §0.9)
 // ---------------------------------------------------------------------------
 const CARD_CSS = `
-.lmg { --lmg-ctx: var(--lmg-accent, var(--primary-color, #2196F3)); padding: 12px 14px 10px; overflow: hidden; }
+.lmg { --lmg-ctx: var(--lmg-accent, var(--primary-color, #2196F3));
+  --lmg-box: var(--lmg-box-background, rgba(127,127,127,0.10));
+  padding: var(--lmg-card-padding, 12px) calc(var(--lmg-card-padding, 12px) + 2px) calc(var(--lmg-card-padding, 12px) - 2px);
+  overflow: hidden; background: var(--lmg-card-background, var(--ha-card-background, var(--card-background-color)));
+  border-radius: var(--lmg-card-radius, var(--ha-card-border-radius, 12px)); }
+.lmg.has-border { border: 1px solid var(--lmg-card-border-color); }
 .lmg.is-hdr { --lmg-ctx: var(--lmg-hdr, #ffb300); }
 .lmg.is-game { --lmg-ctx: var(--lmg-game, #4caf50); }
 .lmg [hidden] { display: none !important; }
 .lmg button { font: inherit; }
 .lmg-head { display: flex; align-items: center; gap: 10px; min-height: 36px; }
-.lmg-power { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
-  background: transparent; color: var(--disabled-text-color, #777); display: flex; align-items: center; justify-content: center;
-  transition: background .2s, color .2s; --mdc-icon-size: 22px; }
-.lmg.is-on .lmg-power { color: var(--lmg-ctx); background: color-mix(in srgb, var(--lmg-ctx) 16%, transparent); }
-.lmg-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; white-space: nowrap; }
+.lmg-power { flex: 0 0 auto; width: calc(var(--lmg-header-icon-size, 22px) + 14px); height: calc(var(--lmg-header-icon-size, 22px) + 14px);
+  border-radius: 50%; border: none; cursor: pointer; background: transparent; color: var(--disabled-text-color, #777);
+  display: flex; align-items: center; justify-content: center; transition: background .2s, color .2s;
+  --mdc-icon-size: var(--lmg-header-icon-size, 22px); }
+.lmg.is-on .lmg-power { color: var(--lmg-header-icon-color, var(--lmg-ctx)); background: color-mix(in srgb, var(--lmg-header-icon-color, var(--lmg-ctx)) 16%, transparent); }
+.lmg-title { display: flex; align-items: center; gap: 8px; font-size: var(--lmg-title-size, 16px); font-weight: 500; white-space: nowrap;
+  color: var(--lmg-title-color, var(--primary-text-color)); }
 .lmg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--disabled-text-color, #777); }
 .lmg-dot.ok { background: var(--success-color, #4caf50); }
 .lmg-dot.bad { background: var(--error-color, #f44336); }
-.lmg-summary { margin-left: auto; min-width: 0; font-size: 13px; color: var(--secondary-text-color);
+.lmg-summary { margin-left: auto; min-width: 0; font-size: var(--lmg-summary-size, 13px); color: var(--lmg-summary-color, var(--secondary-text-color));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lmg.is-down .lmg-summary { color: var(--error-color, #f44336); }
-.lmg-standby { padding: 2px 0 2px 46px; font-size: 13px; color: var(--secondary-text-color); }
+.lmg-standby { padding: 2px 0 2px 46px; font-size: var(--lmg-secondary-size, 13px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-chain { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr); gap: 6px; margin-top: 10px; }
-.lmg-box { min-width: 0; padding: 8px 6px; border-radius: 10px; text-align: center; background: rgba(127,127,127,0.08); }
-.lmg-box-h { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--secondary-text-color); }
-.lmg-box-t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lmg-box-s { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lmg-arrow { align-self: center; color: var(--lmg-ctx); --mdc-icon-size: 18px; }
+.lmg-box { min-width: 0; padding: 8px 6px; border-radius: 10px; text-align: center; background: var(--lmg-box); }
+.lmg-box-h { font-size: var(--lmg-subtitle-size, 10px); letter-spacing: .08em; text-transform: uppercase; color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
+.lmg-box-t { font-size: var(--lmg-text-size, 14px); font-weight: 600; color: var(--lmg-text-color, var(--primary-text-color));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lmg-box-s { font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lmg-arrow { align-self: center; color: var(--lmg-icon-color, var(--lmg-ctx)); --mdc-icon-size: 18px; }
 .lmg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .lmg-tags:empty { display: none; }
 .lmg-tag { padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 11px; font-weight: 600;
@@ -237,46 +393,52 @@ const CARD_CSS = `
 .lmg-tag.game { color: var(--lmg-game, #4caf50); }
 .lmg-tag.ctx { color: var(--lmg-ctx); }
 .lmg-tag.bad { color: var(--error-color, #f44336); }
-.lmg-viz { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.lmg-viz svg { display: block; height: 60px; flex: 0 0 auto; }
-.lmg-viz rect { transition: x .4s ease, y .4s ease, width .4s ease, height .4s ease; }
-.lmg-raster { fill: #000; stroke: rgba(127,127,127,0.55); stroke-width: 1; }
-.lmg-content { fill: color-mix(in srgb, var(--lmg-ctx) 55%, transparent); }
-.lmg-screen { fill: rgba(127,127,127,0.10); stroke: rgba(127,127,127,0.6); stroke-width: 1; }
-.lmg-image { fill: color-mix(in srgb, var(--lmg-ctx) 55%, transparent); }
-.lmg-viz-arrow { color: var(--secondary-text-color); --mdc-icon-size: 16px; flex: 0 0 auto; }
-.lmg-legend { min-width: 0; font-size: 12px; line-height: 1.5; color: var(--secondary-text-color); }
-.lmg-legend b { color: var(--primary-text-color); font-weight: 600; }
-.lmg-hdrp { margin-top: 8px; font-size: 12px; color: var(--secondary-text-color); }
-.lmg-hdrp b { color: var(--primary-text-color); }
+.lmg-viz { display: flex; align-items: flex-start; justify-content: center; gap: 12px; margin-top: 12px; }
+.lmg-scr { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.lmg-scr > svg { display: block; height: var(--lmg-viz-height, 72px); width: auto; max-width: 100%; overflow: visible; }
+.lmg-viz-arrow { align-self: flex-start; margin-top: calc(var(--lmg-viz-height, 72px) / 2 - 9px); color: var(--lmg-icon-color, var(--secondary-text-color)); --mdc-icon-size: 18px; }
+.lmg-cap { margin-top: 4px; text-align: center; font-size: var(--lmg-caption-size, 11px); line-height: 1.35;
+  color: var(--lmg-caption-color, var(--secondary-text-color)); }
+.lmg-cap b { color: var(--lmg-text-color, var(--primary-text-color)); font-weight: 600; }
+.lmg-frame { fill: #000; }
+.lmg-edge { fill: none; stroke: rgba(127,127,127,0.6); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.lmg-sel { fill: none; stroke: var(--lmg-ctx); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.lmg-wall { fill: rgba(127,127,127,0.18); }
+.lmg-hdrp { margin-top: 8px; font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-hdrp b { color: var(--lmg-text-color, var(--primary-text-color)); }
 .lmg-bar { position: relative; height: 6px; margin-top: 4px; border-radius: 3px; background: rgba(127,127,127,0.2); overflow: hidden; }
 .lmg-bar > span { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--lmg-hdr, #ffb300); transition: width .4s ease; }
+.lmg-fold { margin-top: 10px; border-top: 1px solid rgba(127,127,127,0.2); }
+.lmg-fold > summary { display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; cursor: pointer; list-style: none;
+  font-size: var(--lmg-section-title-size, 14px); color: var(--lmg-section-title-color, var(--primary-text-color)); user-select: none; }
+.lmg-fold > summary::-webkit-details-marker { display: none; }
+.lmg-fold > summary .lmg-sec-i { color: var(--lmg-section-icon-color, var(--lmg-ctx)); --mdc-icon-size: var(--lmg-section-icon-size, 18px); }
+.lmg-fold > summary .lmg-chev { margin-left: auto; color: var(--secondary-text-color); --mdc-icon-size: 18px; transition: transform .2s; }
+.lmg-fold[open] > summary .lmg-chev { transform: rotate(90deg); }
+.lmg-fold > summary .lmg-peek { font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lmg-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; }
-.lmg-row-l { flex: 0 0 56px; padding-top: 6px; font-size: 12px; color: var(--secondary-text-color); }
+.lmg-row-l { flex: 0 0 56px; padding-top: 6px; font-size: var(--lmg-subtitle-size, 12px); color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
 .lmg-opts { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.lmg-chip { padding: 5px 10px; border: 1px solid rgba(127,127,127,0.35); border-radius: 8px; cursor: pointer;
-  background: transparent; color: var(--primary-text-color); font-size: 13px; white-space: nowrap; transition: background .2s, border-color .2s; }
+.lmg-chip { padding: 5px 10px; border: 1px solid var(--lmg-chip-border-color, rgba(127,127,127,0.35)); border-radius: 8px; cursor: pointer;
+  background: var(--lmg-chip-background, transparent); color: var(--lmg-chip-color, var(--primary-text-color));
+  font-size: var(--lmg-chip-size, 13px); white-space: nowrap; transition: background .2s, border-color .2s; }
 .lmg-chip:hover { border-color: var(--lmg-ctx); }
 .lmg-chip.on { background: var(--lmg-ctx); border-color: var(--lmg-ctx); color: #fff; }
 .lmg-chip.act { border-style: dashed; color: var(--lmg-ctx); }
 .lmg-held { outline: 2px solid var(--lmg-ctx); outline-offset: 1px; }
 .lmg.is-off .lmg-ctl, .lmg.is-down .lmg-ctl { opacity: .45; pointer-events: none; }
 .lmg.is-down [data-sec="chain"] .lmg-chain, .lmg.is-down [data-sec="visualizer"], .lmg.is-down [data-sec="hdr"] { opacity: .45; }
-.lmg-fold { margin-top: 10px; border-top: 1px solid rgba(127,127,127,0.2); }
-.lmg-fold > summary { display: flex; align-items: center; gap: 6px; padding: 8px 0 2px; cursor: pointer; list-style: none;
-  font-size: 13px; color: var(--secondary-text-color); }
-.lmg-fold > summary::-webkit-details-marker { display: none; }
-.lmg-fold > summary ha-icon { --mdc-icon-size: 18px; transition: transform .2s; }
-.lmg-fold[open] > summary ha-icon { transform: rotate(90deg); }
 .lmg-pad { display: grid; grid-template-columns: repeat(3, 64px); grid-auto-rows: 44px; gap: 6px; justify-content: center; margin-top: 6px; }
 .lmg-key { display: flex; align-items: center; justify-content: center; border: none; border-radius: 10px; cursor: pointer;
-  background: rgba(127,127,127,0.12); color: var(--primary-text-color); font-size: 12px; --mdc-icon-size: 22px; }
+  background: var(--lmg-box); color: var(--lmg-icon-color, var(--primary-text-color)); font-size: var(--lmg-chip-size, 12px);
+  --mdc-icon-size: var(--lmg-icon-size, 22px); }
 .lmg-key:hover { background: color-mix(in srgb, var(--lmg-ctx) 20%, transparent); }
 .lmg-key.ok { background: color-mix(in srgb, var(--lmg-ctx) 30%, transparent); color: var(--lmg-ctx); }
-.lmg-key.sm { color: var(--secondary-text-color); }
+.lmg-key.sm { color: var(--lmg-chip-color, var(--secondary-text-color)); }
 .lmg-admin { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin-top: 6px; }
 .lmg-admin .lmg-chip { text-align: center; }
-.lmg-note { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--secondary-text-color); }
+.lmg-note { margin-top: 8px; font-size: var(--lmg-secondary-size, 12px); line-height: 1.5; color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-note.bad { color: var(--error-color, #f44336); }
 .lmg-hint { margin-top: 4px; font-size: 11px; color: var(--secondary-text-color); text-align: center; }
 `;
@@ -298,6 +460,7 @@ class LumagenCard extends HTMLElement {
     this._press = null;
     this._editMode = false;
     this._preview = false;
+    this._open = new Set(); // sections the user has opened (survives config changes)
   }
 
   setConfig(config) {
@@ -316,7 +479,7 @@ class LumagenCard extends HTMLElement {
   set editMode(v) { this._editMode = !!v; this._applyVisibility(); }
   set preview(v) { this._preview = !!v; this._applyVisibility(); }
 
-  getCardSize() { return 8; }
+  getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, min_columns: 6, rows: 'auto' }; }
 
   _schedule() {
@@ -327,23 +490,25 @@ class LumagenCard extends HTMLElement {
   // -- build once -----------------------------------------------------------
   _build() {
     const c = this._config;
-    const fold = (sec, icon, label, body) => `
-      <details class="lmg-fold" data-sec="${sec}">
-        <summary><ha-icon icon="mdi:chevron-right"></ha-icon><ha-icon icon="${icon}"></ha-icon>${label}</summary>
+    const fold = (sec, iconKey, label, body) => `
+      <details class="lmg-fold" data-sec="${sec}"${this._open.has(sec) ? ' open' : ''}>
+        <summary><ha-icon class="lmg-sec-i" icon="${esc(iconFor(c, iconKey))}"></ha-icon><span>${label}</span>
+          <span class="lmg-peek" data-peek="${sec}"></span><ha-icon class="lmg-chev" icon="mdi:chevron-right"></ha-icon></summary>
         ${body}
       </details>`;
     const key = (cmd, inner, cls = '', hold = '') =>
       `<button class="lmg-key ${cls}" data-tap="remote" data-cmd="${cmd}"${hold ? ' data-hold="remote-repeat"' : ''} aria-label="${cmd}">${inner}</button>`;
     const admin = (id, label) => `<button class="lmg-chip" data-hold="${id}" data-a="${id}">${label}</button>`;
+    const afterOnly = cfg(c, 'viz_after_only');
     this.innerHTML = `
       <style>${CARD_CSS}</style>
-      <ha-card class="lmg" style="${esc(rootStyleVars(c))}">
+      <ha-card class="lmg${c.styles && c.styles.card_border_color ? ' has-border' : ''}" style="${esc(rootStyleVars(c))}">
         <div class="lmg-head">
-          <button class="lmg-power" data-tap="power" data-hold="power-off" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button>
+          <button class="lmg-power" data-tap="power" data-hold="power-off" aria-label="Power"><ha-icon icon="${esc(iconFor(c, 'header'))}"></ha-icon></button>
           <div class="lmg-title"><span>${esc(cfg(c, 'title'))}</span><span class="lmg-dot" data-k="dot"></span></div>
           <div class="lmg-summary" data-k="summary"></div>
         </div>
-        <div class="lmg-standby" data-k="standby" hidden>Standby · tap <ha-icon icon="mdi:power" style="--mdc-icon-size:14px"></ha-icon> to power on</div>
+        <div class="lmg-standby" data-k="standby" hidden>Standby · tap the icon to power on</div>
         <div class="lmg-body" data-k="body">
           <div data-sec="chain">
             <div class="lmg-chain">
@@ -356,35 +521,53 @@ class LumagenCard extends HTMLElement {
             <div class="lmg-tags" data-k="tags"></div>
           </div>
           <div class="lmg-viz" data-sec="visualizer">
-            <svg viewBox="0 0 100 60" width="100" height="60" aria-label="Source frame">
-              <rect class="lmg-raster" data-r="raster"></rect><rect class="lmg-content" data-r="content"></rect>
-            </svg>
-            <ha-icon class="lmg-viz-arrow" icon="mdi:arrow-right"></ha-icon>
-            <svg viewBox="0 0 120 60" width="120" height="60" aria-label="Screen">
-              <rect class="lmg-screen" data-r="screen"></rect><rect class="lmg-image" data-r="image"></rect>
-            </svg>
-            <div class="lmg-legend" data-k="legend"></div>
+            <div class="lmg-scr" data-k="before"${afterOnly ? ' hidden' : ''}>
+              <svg data-v="src" aria-label="Source frame">
+                <rect class="lmg-frame" data-v="src-frame"></rect>
+                <image data-v="src-img" preserveAspectRatio="xMidYMid slice"></image>
+                <rect class="lmg-sel" data-v="src-sel"></rect>
+                <rect class="lmg-edge" data-v="src-edge"></rect>
+              </svg>
+              <div class="lmg-cap" data-k="cap_before"></div>
+            </div>
+            <ha-icon class="lmg-viz-arrow" icon="mdi:arrow-right"${afterOnly ? ' hidden' : ''}></ha-icon>
+            <div class="lmg-scr">
+              <svg data-v="scr" aria-label="Screen">
+                <rect class="lmg-wall" data-v="scr-wall"></rect>
+                <svg data-v="out" preserveAspectRatio="none">
+                  <rect class="lmg-frame" data-v="out-frame"></rect>
+                  <image data-v="out-img" preserveAspectRatio="xMidYMid slice"></image>
+                </svg>
+                <rect class="lmg-edge" data-v="scr-edge"></rect>
+              </svg>
+              <div class="lmg-cap" data-k="cap_after"></div>
+            </div>
           </div>
           <div class="lmg-hdrp" data-sec="hdr" data-k="hdr"></div>
-          <div class="lmg-ctl">
-            <div class="lmg-row" data-sec="inputs" data-row="input"><div class="lmg-row-l">Input</div><div class="lmg-opts" data-opts="input"></div></div>
-            <div class="lmg-row" data-sec="memory" data-row="memory"><div class="lmg-row-l">Memory</div><div class="lmg-opts" data-opts="memory"></div></div>
-            <div class="lmg-row" data-sec="aspects" data-row="aspect"><div class="lmg-row-l">Aspect</div><div class="lmg-opts">
+          ${fold('aspects', 'aspect', 'Aspect', `
+            <div class="lmg-ctl"><div class="lmg-row" data-row="aspect"><div class="lmg-opts">
               <span class="lmg-opts" data-opts="aspect"></span>
               <button class="lmg-chip act" data-tap="nls" data-a="nls_btn">NLS</button>
-              <button class="lmg-chip act" data-tap="reset_aa" data-a="reset_aa">Reset</button>
-            </div></div>
-            <div class="lmg-row" data-sec="picture" data-row="cms"><div class="lmg-row-l">CMS</div><div class="lmg-opts" data-opts="cms"></div></div>
-            <div class="lmg-row" data-sec="picture" data-row="style"><div class="lmg-row-l">Style</div><div class="lmg-opts" data-opts="style"></div></div>
-          </div>
-          ${fold('remote', 'mdi:remote', 'Menu remote', `
-            <div class="lmg-pad">
+              <button class="lmg-chip act" data-tap="reset_aa" data-a="reset_aa">Reset auto</button>
+            </div></div></div>`)}
+          ${fold('remote', 'remote', 'Remote', `
+            <div class="lmg-ctl"><div class="lmg-pad">
               ${key('menu', 'Menu', 'sm')}${key('up', '<ha-icon icon="mdi:chevron-up"></ha-icon>', '', 1)}${key('exit', 'Exit', 'sm')}
               ${key('left', '<ha-icon icon="mdi:chevron-left"></ha-icon>', '', 1)}${key('ok', 'OK', 'ok')}${key('right', '<ha-icon icon="mdi:chevron-right"></ha-icon>', '', 1)}
               ${key('clear', 'Clear', 'sm')}${key('down', '<ha-icon icon="mdi:chevron-down"></ha-icon>', '', 1)}${key('help', 'Help', 'sm')}
             </div>
-            <div class="lmg-hint">Hold an arrow to repeat it 5×</div>`)}
-          ${fold('admin', 'mdi:tools', 'Admin & link', `
+            <div class="lmg-hint">Hold an arrow to repeat it 5×</div></div>`)}
+          ${fold('source', 'source', 'Source', `
+            <div class="lmg-ctl">
+              <div class="lmg-row" data-row="input" data-opt-sec="inputs"><div class="lmg-row-l">Input</div><div class="lmg-opts" data-opts="input"></div></div>
+              <div class="lmg-row" data-row="memory" data-opt-sec="memory"><div class="lmg-row-l">Memory</div><div class="lmg-opts" data-opts="memory"></div></div>
+            </div>`)}
+          ${fold('picture', 'picture', 'Picture', `
+            <div class="lmg-ctl">
+              <div class="lmg-row" data-row="cms"><div class="lmg-row-l">CMS</div><div class="lmg-opts" data-opts="cms"></div></div>
+              <div class="lmg-row" data-row="style"><div class="lmg-row-l">Style</div><div class="lmg-opts" data-opts="style"></div></div>
+            </div>`)}
+          ${fold('admin', 'admin', 'Admin & link', `
             <div class="lmg-admin">
               ${admin('hotplug', 'Hotplug')}${admin('restart', 'Restart outputs')}${admin('reload', 'Reload config')}
               ${admin('osd_test', 'OSD test')}${admin('osd_clear', 'Clear OSD')}${admin('alt', 'ALT')}
@@ -397,8 +580,16 @@ class LumagenCard extends HTMLElement {
     this._root = this.querySelector('.lmg');
     this._k = {};
     this.querySelectorAll('[data-k]').forEach((el) => { this._k[el.dataset.k] = el; });
-    this._r = {};
-    this.querySelectorAll('[data-r]').forEach((el) => { this._r[el.dataset.r] = el; });
+    this._v = {};
+    this.querySelectorAll('[data-v]').forEach((el) => { this._v[el.dataset.v] = el; });
+    const scene = cfg(c, 'scene_image') || SCENE_URL;
+    ['src-img', 'out-img'].forEach((k) => {
+      this._v[k].setAttribute('href', scene);
+      this._v[k].setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', scene);
+    });
+    this.querySelectorAll('details.lmg-fold').forEach((d) => d.addEventListener('toggle', () => {
+      if (d.open) this._open.add(d.dataset.sec); else this._open.delete(d.dataset.sec);
+    }));
     this._bind();
     this._built = true;
     this._sig = '';
@@ -504,6 +695,7 @@ class LumagenCard extends HTMLElement {
 
     const K = this._k;
     const set = (k, text) => { if (K[k] && K[k].textContent !== text) K[k].textContent = text; };
+    const html = (el, markup) => { if (el && el.innerHTML !== markup) el.innerHTML = markup; };
     const power = v('power');
     const link = v('connected');
     this._powerState = power;
@@ -522,22 +714,24 @@ class LumagenCard extends HTMLElement {
     R.toggle('is-game', isGame);
 
     // header
-    K.dot.className = 'lmg-dot' + (link === 'on' ? ' ok' : link === 'off' ? ' bad' : '');
-    K.dot.title = link === 'on' ? 'Link OK' : link === 'off' ? 'Link down' : '';
+    const dotCls = 'lmg-dot' + (link === 'on' ? ' ok' : link === 'off' ? ' bad' : '');
+    if (K.dot.className !== dotCls) K.dot.className = dotCls;
     const summary = !found ? 'No Lumagen found — pick a device in the card editor'
       : isDown ? 'Offline'
-      : !isOn ? 'Standby'
-        : [v('input_label'), v('src_dr'), v('out_aspect')].filter(okState).join(' · ');
+        : !isOn ? 'Standby'
+          : [v('input_label'), v('src_dr'), v('out_aspect')].filter(okState).join(' · ');
     set('summary', summary);
     K.standby.hidden = !found || isOn || isDown;
     K.body.hidden = !found || (!isOn && !isDown);
 
     // sections on/off (config) + entity availability
-    const secOn = (name) => cfg(c, 'show_' + name);
     this.querySelectorAll('[data-sec]').forEach((el) => {
       const sec = el.dataset.sec;
-      let show = secOn(sec);
+      let show = sec === 'source' ? (cfg(c, 'show_inputs') || cfg(c, 'show_memory')) : cfg(c, 'show_' + sec);
       if (sec === 'remote') show = show && !!E.remote;
+      if (sec === 'aspects') show = show && !!E.aspect;
+      if (sec === 'source') show = show && !!(E.input || E.memory);
+      if (sec === 'picture') show = show && !!(E.cms || E.style);
       if (sec === 'hdr') show = show && isHdr && okState(v('hdr_max'));
       el.hidden = !show;
     });
@@ -561,13 +755,12 @@ class LumagenCard extends HTMLElement {
     if (isDown) tags.push(['LINK DOWN', 'bad']);
     if (isHdr) tags.push(['HDR', 'hdr']);
     if (isGame) tags.push(['GAME', 'game']);
-    if (isOn && v('nls') === 'True') tags.push(['NLS', 'ctx']);
-    if (isOn && v('auto_aspect') === 'on') tags.push(['AUTO AR', '']);
-    if (isOn && okState(v('src_3d')) && v('src_3d') !== 'Off') tags.push([`3D ${v('src_3d')}`, '']);
-    if (isOn && v('video_status') === 'No Source') tags.push(['NO SOURCE', 'bad']);
-    if (isOn && v('video_status') === 'Test Pattern') tags.push(['TEST PATTERN', '']);
-    const tagHtml = tags.map(([t, cls]) => `<span class="lmg-tag ${cls}">${esc(t)}</span>`).join('');
-    if (K.tags.innerHTML !== tagHtml) K.tags.innerHTML = tagHtml;
+    if (live && v('nls') === 'True') tags.push(['NLS', 'ctx']);
+    if (live && v('auto_aspect') === 'on') tags.push(['AUTO AR', '']);
+    if (live && okState(v('src_3d')) && v('src_3d') !== 'Off') tags.push([`3D ${v('src_3d')}`, '']);
+    if (live && v('video_status') === 'No Source') tags.push(['NO SOURCE', 'bad']);
+    if (live && v('video_status') === 'Test Pattern') tags.push(['TEST PATTERN', '']);
+    html(K.tags, tags.map(([t, cls]) => `<span class="lmg-tag ${cls}">${esc(t)}</span>`).join(''));
 
     // visualizer
     this._drawViz(v);
@@ -578,9 +771,8 @@ class LumagenCard extends HTMLElement {
       const min = okState(v('hdr_min')) ? Number(v('hdr_min')) : null;
       const cll = okState(v('hdr_cll')) ? Math.round(Number(v('hdr_cll'))) : 0;
       const pct = max > 0 && cll > 0 ? Math.min(100, (cll / max) * 100) : 0;
-      const html = `Mastered <b>${max} nits</b>${min !== null ? ` · min ${min}` : ''}${cll ? ` · MaxCLL <b>${cll}</b>` : ''}`
-        + (cll ? `<div class="lmg-bar"><span style="width:${pct.toFixed(1)}%"></span></div>` : '');
-      if (K.hdr.innerHTML !== html) K.hdr.innerHTML = html;
+      html(K.hdr, `Mastered <b>${max} nits</b>${min !== null ? ` · min ${min}` : ''}${cll ? ` · MaxCLL <b>${cll}</b>` : ''}`
+        + (cll ? `<div class="lmg-bar"><span style="width:${pct.toFixed(1)}%"></span></div>` : ''));
     }
 
     // chip rows
@@ -590,19 +782,28 @@ class LumagenCard extends HTMLElement {
     this._chips('cms', E.cms, st('cms'));
     this._chips('style', E.style, st('style'));
     this.querySelectorAll('[data-row]').forEach((row) => {
-      if (!secOn(row.dataset.sec)) return;
-      row.hidden = !E[row.dataset.row];
+      const optSec = row.dataset.optSec;
+      row.hidden = !E[row.dataset.row] || (optSec ? !cfg(c, 'show_' + optSec) : false);
     });
+    const svc = (n) => !!(h.services && h.services.lumagen && h.services.lumagen[n]);
     this.querySelectorAll('[data-a]').forEach((b) => {
-      const a = b.dataset.a;
-      const svc = (n) => !!(h.services && h.services.lumagen && h.services.lumagen[n]);
       const avail = {
         nls_btn: !!E.nls_btn, reset_aa: !!E.reset_aa, restart: !!E.restart, reload: !!E.reload,
         hotplug: !!E.remote && svc('hotplug'), osd_test: !!E.remote && svc('show_osd_volume'),
         osd_clear: !!E.remote && svc('clear_osd_message'), alt: !!E.remote,
-      }[a];
+      }[b.dataset.a];
       b.hidden = !avail;
     });
+
+    // section peeks: current value shown on the collapsed header
+    const peek = (sec, text) => {
+      const el = this.querySelector(`[data-peek="${sec}"]`);
+      if (el && el.textContent !== text) el.textContent = text;
+    };
+    peek('aspects', [okState(v('aspect')) ? v('aspect') : '', live && v('auto_aspect') === 'on' ? 'auto' : '', live && v('nls') === 'True' ? 'NLS' : ''].filter(Boolean).join(' · '));
+    peek('source', [okState(v('input_label')) ? v('input_label') : '', mem !== '—' ? `MEM ${mem}` : ''].filter(Boolean).join(' · '));
+    peek('picture', [v('cms_label'), v('style_label')].filter(okState).join(' · '));
+    peek('admin', link === 'off' ? 'link down' : '');
 
     // admin notes
     const ls = st('connected');
@@ -610,10 +811,10 @@ class LumagenCard extends HTMLElement {
       const a = ls.attributes || {};
       const why = a.last_disconnect_reason;
       set('link', `Link ${ls.state === 'on' ? 'connected' : 'DOWN'} · ${a.reconnects || 0} reconnects · watchdog ${a.watchdog || '—'}${why ? ` · last: ${why}` : ''}`);
-      K.link.className = 'lmg-note' + (ls.state === 'on' ? '' : ' bad');
+      const cls = 'lmg-note' + (ls.state === 'on' ? '' : ' bad');
+      if (K.link.className !== cls) K.link.className = cls;
     } else {
       set('link', 'Link status needs the LTek lumagen integration (Connected sensor not found).');
-      K.link.className = 'lmg-note';
     }
     const missing = Object.entries(OPTIONAL_ENTITIES).filter(([k]) => !E[k]).map(([, n]) => n);
     set('missing', missing.length ? `Disabled: ${missing.join(' · ')} — enable in Settings → Devices & services → Lumagen → device → Entities.` : '');
@@ -639,24 +840,38 @@ class LumagenCard extends HTMLElement {
 
   _drawViz(v) {
     const raster = parseAspect(v('src_raster')) || 1.78;
-    const content = parseAspect(v('src_content')) || raster;
+    const selected = parseAspect(v('src_content')) || raster;
+    const content = parseAspect(v('det_content')) || selected; // the real picture
     const screen = Number(cfg(this._config, 'display_aspect')) || 1.78;
-    const out = parseAspect(v('out_aspect')) || screen;
-    const r = fitRect(2, 2, 96, 56, raster);
-    const ct = fitRect(r.x, r.y, r.w, r.h, content);
-    const s = fitRect(2, 2, 116, 56, screen);
-    const im = fitRect(s.x, s.y, s.w, s.h, out);
-    const put = (el, g) => {
-      if (!el) return;
-      ['x', 'y'].forEach((k) => { el.setAttribute(k, g[k].toFixed(2)); el.style[k] = g[k].toFixed(2) + 'px'; });
-      el.setAttribute('width', g.w.toFixed(2)); el.style.width = g.w.toFixed(2) + 'px';
-      el.setAttribute('height', g.h.toFixed(2)); el.style.height = g.h.toFixed(2) + 'px';
-    };
-    put(this._r.raster, r); put(this._r.content, ct); put(this._r.screen, s); put(this._r.image, im);
-    const f = (n) => n.toFixed(2);
-    const html = `Content <b>${f(content)}</b>${Math.abs(content - raster) > 0.01 ? ` in ${f(raster)} frame` : ''}<br>`
-      + `Output <b>${f(out)}</b> on ${f(screen)} screen`;
-    if (this._k.legend.innerHTML !== html) this._k.legend.innerHTML = html;
+    const output = parseAspect(v('out_aspect')) || screen;
+    const g = vizGeometry({ raster, content, selected, output, screen });
+    const V = this._v;
+    const attrs = (el, o) => Object.entries(o).forEach(([k, val]) => {
+      const s = typeof val === 'number' ? val.toFixed(2) : val;
+      if (el.getAttribute(k) !== s) el.setAttribute(k, s);
+    });
+    const rect = (r) => ({ x: r.x, y: r.y, width: r.w, height: r.h });
+    const vb = (x, y, w, h) => `${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`;
+    // before: the incoming frame with the real picture, and the region the Lumagen uses
+    attrs(V.src, { viewBox: vb(0, 0, g.source.w, g.source.h) });
+    attrs(V['src-frame'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
+    attrs(V['src-edge'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
+    attrs(V['src-img'], rect(g.content));
+    attrs(V['src-sel'], rect(g.selected));
+    V['src-sel'].style.display = Math.abs(selected - content) > 0.01 ? '' : 'none';
+    // after: the screen, with the selected region stretched into the output image area
+    attrs(V.scr, { viewBox: vb(0, 0, g.screen.w, g.screen.h) });
+    attrs(V['scr-wall'], { x: 0, y: 0, width: g.screen.w, height: g.screen.h });
+    attrs(V['scr-edge'], { x: 0, y: 0, width: g.screen.w, height: g.screen.h });
+    attrs(V.out, { ...rect(g.image), viewBox: vb(g.selected.x, g.selected.y, g.selected.w, g.selected.h) });
+    attrs(V['out-frame'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
+    attrs(V['out-img'], rect(g.content));
+    const nls = v('nls') === 'True';
+    const before = `Content <b>${f2(content)}</b>${Math.abs(content - raster) > 0.01 ? ` in ${f2(raster)} frame` : ''}`
+      + (Math.abs(selected - content) > 0.01 ? `<br>Lumagen set to ${f2(selected)}` : '');
+    const after = `Content <b>${f2(selected)}</b> · Output <b>${f2(output)}</b><br>on ${f2(screen)} screen${nls ? ' · NLS' : ''}`;
+    if (this._k.cap_before.innerHTML !== before) this._k.cap_before.innerHTML = before;
+    if (this._k.cap_after.innerHTML !== after) this._k.cap_after.innerHTML = after;
   }
 }
 
@@ -675,7 +890,7 @@ const THEME_COLORS = [
   ['var(--success-color)', 'Success'],
   ['var(--info-color)', 'Info'],
 ];
-const COLOR_OPTS = [
+const CONTEXT_COLORS = [
   ['accent_color', 'Accent', 'Theme primary', '#2196f3'],
   ['hdr_color', 'HDR', 'Amber', '#ffb300'],
   ['game_color', 'Game mode', 'Green', '#4caf50'],
@@ -761,19 +976,28 @@ const EDITOR_CSS = `
         .lmge-sec[open] { border-color: var(--ltek-c-accent); }
         .lmge-sec > summary { display: flex; align-items: center; gap: var(--ltek-sp-3); padding: 14px 16px; cursor: pointer; user-select: none;
           list-style: none; font-size: var(--ltek-fs-panel-title); font-weight: var(--ltek-fw-bold); color: var(--ltek-c-text); }
-        .lmge-sec > summary::-webkit-details-marker { display: none; }
+        .lmge-sec > summary::-webkit-details-marker, .lmge-sub > summary::-webkit-details-marker { display: none; }
         .lmge-sec > summary > ha-icon:not(.chev) { color: var(--ltek-c-accent); --mdc-icon-size: var(--ltek-icon-lg); }
-        .lmge-sec > summary .chev { margin-left: auto; color: #999; --mdc-icon-size: 22px; transition: transform .2s ease; transform: rotate(-90deg); }
-        .lmge-sec[open] > summary .chev { transform: none; }
+        .lmge-sec > summary .chev, .lmge-sub > summary .chev { margin-left: auto; color: #999; --mdc-icon-size: 20px; transition: transform .2s ease; transform: rotate(-90deg); }
+        .lmge-sec[open] > summary .chev, .lmge-sub[open] > summary .chev { transform: none; }
         .lmge-body { padding: 0 16px 16px; }
         .lmge-hint { color: var(--ltek-c-muted); font-size: var(--ltek-fs-small); margin: 0 0 var(--ltek-sp-3); }
         .lmge-group { color: var(--accent-color, var(--ltek-c-accent)); font-size: var(--ltek-fs-group); font-weight: var(--ltek-fw-semibold);
           margin-top: var(--ltek-sp-4); padding-top: var(--ltek-sp-3); border-top: 1px solid var(--ltek-c-border-soft); }
+        .lmge-group.first { margin-top: 0; padding-top: 0; border-top: none; }
+        .lmge-sub { border-top: 1px solid var(--ltek-c-border-soft); border-radius: var(--ltek-r-ctrl); }
+        .lmge-sub + .lmge-sub { margin-top: 0; }
+        .lmge-sub[open] { border: 1px solid var(--accent-color, var(--ltek-c-accent)); margin: var(--ltek-sp-1) 0; }
+        .lmge-sub > summary { display: flex; align-items: center; gap: var(--ltek-sp-2); padding: var(--ltek-sp-3) var(--ltek-sp-2); cursor: pointer;
+          list-style: none; color: var(--ltek-c-accent); font-size: var(--ltek-fs-label); font-weight: var(--ltek-fw-semibold);
+          text-transform: uppercase; letter-spacing: 0.04em; }
+        .lmge-sub-body { padding: 0 var(--ltek-sp-4) var(--ltek-sp-4); }
         .lmge-row { display: flex; align-items: center; gap: var(--ltek-sp-4); padding: var(--ltek-sp-1) 0; flex-wrap: wrap; justify-content: flex-start; }
         .lmge-row label.lbl { color: var(--ltek-c-label); font-size: var(--ltek-fs-body); font-weight: var(--ltek-fw-normal); flex: none; }
         .lmge-row input[type="text"], .lmge-row select { flex: 1 1 auto; min-width: 0; padding: var(--ltek-ctrl-pad);
           background: var(--secondary-background-color, #2a2a2a); border: 1px solid var(--ltek-c-border); border-radius: var(--ltek-r-ctrl);
           color: var(--ltek-c-text); font-size: var(--ltek-fs-body); }
+        .lmge-row ha-icon-picker { flex: 1 1 auto; min-width: 0; }
         .lmge-row input[type="range"] { flex: 1 1 auto; min-width: 100px; accent-color: var(--ltek-c-accent); cursor: pointer; }
         .lmge-val { flex: 0 0 var(--ltek-slider-val-w); text-align: right; font-weight: var(--ltek-fw-bold); font-variant-numeric: tabular-nums;
           white-space: nowrap; color: var(--ltek-c-text); font-size: var(--ltek-fs-body); }
@@ -789,6 +1013,9 @@ const EDITOR_CSS = `
           color: var(--ltek-c-text); font-size: var(--ltek-fs-small); cursor: pointer; }
         .lmge-preset:hover { border-color: var(--ltek-c-accent); background: var(--ltek-c-accent-fade-soft); }
         .lmge-preset.on { border-color: var(--ltek-c-accent); background: var(--ltek-c-accent-fade); color: var(--ltek-c-accent); }
+        .lmge-reset { border: none; background: none; padding: 0; color: var(--ltek-c-icon); cursor: pointer; }
+        .lmge-reset:hover { color: var(--ltek-c-icon-hover); }
+        .lmge-reset ha-icon { --mdc-icon-size: var(--ltek-icon-sm); }
         .lmge-foot { color: var(--ltek-c-muted); font-size: var(--ltek-fs-tiny); text-align: right; }
 `;
 
@@ -819,10 +1046,22 @@ class LumagenCardEditor extends HTMLElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config }, bubbles: true, composed: true }));
   }
 
-  _set(key, value) {
-    if (value === '' || value === undefined || value === null || value === DEFAULTS[key]) delete this._config[key];
-    else this._config[key] = value;
+  /** Write a config value. scope: '' (top level) | 'styles' | 'icons'. Defaults / empty remove the key. */
+  _set(key, value, scope = '') {
+    if (!scope) {
+      if (value === '' || value === undefined || value === null || value === DEFAULTS[key]) delete this._config[key];
+      else this._config[key] = value;
+    } else {
+      const obj = { ...(this._config[scope] || {}) };
+      if (value === '' || value === undefined || value === null) delete obj[key];
+      else obj[key] = value;
+      if (Object.keys(obj).length) this._config[scope] = obj; else delete this._config[scope];
+    }
     this._emit();
+  }
+
+  _get(key, scope = '') {
+    return scope ? (this._config[scope] || {})[key] : this._config[key];
   }
 
   _panel(id, icon, title, body) {
@@ -831,24 +1070,40 @@ class LumagenCardEditor extends HTMLElement {
       <div class="lmge-body">${body}</div></details>`;
   }
 
-  _colorControl(key, label, defaultLabel, seedHex) {
-    const cur = this._config[key] || '';
+  _sub(id, title, body) {
+    return `<details class="lmge-sub" data-panel="${id}"${this._open.has(id) ? ' open' : ''}>
+      <summary>${title}<ha-icon class="chev" icon="mdi:chevron-down"></ha-icon></summary>
+      <div class="lmge-sub-body">${body}</div></details>`;
+  }
+
+  _colorControl(key, label, defaultLabel, seedHex, scope = '') {
+    const cur = this._get(key, scope) || '';
+    const id = `${scope}:${key}`;
     // The mode picked in this editor session wins (e.g. Custom CSS holding a listed theme var);
     // otherwise classify the stored value.
-    const mode = this._cmode[key] || (cur ? colorMode(cur) : 'default');
+    const mode = this._cmode[id] || (cur ? colorMode(cur) : 'default');
+    const data = `data-ckey="${key}" data-scope="${scope}"`;
     let field = '';
     if (mode === 'theme') {
-      field = `<select class="lmge-ctheme" data-ckey="${key}">${THEME_COLORS.map(([v, n]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
+      field = `<select class="lmge-ctheme" ${data}>${THEME_COLORS.map(([v, n]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
     } else if (mode === 'custom') {
       const hex = /^#[0-9a-fA-F]{6}$/.test(cur) ? cur : seedHex;
-      field = `<input type="color" class="lmge-chex" data-ckey="${key}" value="${hex}">`;
+      field = `<input type="color" class="lmge-chex" ${data} value="${hex}">`;
     } else if (mode === 'css') {
-      field = `<input type="text" class="lmge-ccss" data-ckey="${key}" value="${esc(cur)}" placeholder="e.g. tomato, rgba(…), var(--my-color)">`;
+      field = `<input type="text" class="lmge-ccss" ${data} value="${esc(cur)}" placeholder="e.g. tomato, rgba(…), var(--my-color)">`;
     }
     const modes = [['default', defaultLabel], ['theme', 'Theme color'], ['custom', 'Custom color'], ['css', 'Custom CSS']];
     return `<div class="lmge-row"><label class="lbl">${label}</label><div class="lmge-color">
-      <select class="lmge-cmode" data-ckey="${key}" data-seed="${seedHex}">${modes.map(([m, n]) => `<option value="${m}"${m === mode ? ' selected' : ''}>${n}</option>`).join('')}</select>
+      <select class="lmge-cmode" ${data} data-seed="${seedHex}">${modes.map(([m, n]) => `<option value="${m}"${m === mode ? ' selected' : ''}>${n}</option>`).join('')}</select>
       ${field}</div></div>`;
+  }
+
+  _slider(key, label, value, min, max, step, scope = '', fmt = (n) => `${n}px`) {
+    const isSet = this._get(key, scope) !== undefined;
+    return `<div class="lmge-row lmge-nowrap"><label class="lbl">${label}</label>
+      <input type="range" data-skey="${key}" data-scope="${scope}" min="${min}" max="${max}" step="${step}" value="${value}">
+      <span class="lmge-val" data-val="${scope}:${key}">${fmt(value)}</span>
+      ${isSet && scope ? `<button class="lmge-reset" data-reset="${key}" data-scope="${scope}" title="Back to default"><ha-icon icon="mdi:restore"></ha-icon></button>` : ''}</div>`;
   }
 
   _render() {
@@ -857,6 +1112,7 @@ class LumagenCardEditor extends HTMLElement {
     const devices = listDevices(this._hass);
     const dev = cfg(c, 'device');
     const aspect = Number(cfg(c, 'display_aspect'));
+    const st = c.styles || {};
     const deviceBody = `
       <p class="lmge-hint">Which Lumagen to show. Entities are found automatically, so renamed entity IDs keep working.</p>
       <div class="lmge-row"><label class="lbl">Device</label>
@@ -869,28 +1125,41 @@ class LumagenCardEditor extends HTMLElement {
       <p class="lmge-hint">Header title and what the card does while the Lumagen is off.</p>
       <div class="lmge-row"><label class="lbl">Title</label><input type="text" data-key="title" value="${esc(cfg(c, 'title'))}"></div>
       <label class="lmge-check"><input type="checkbox" data-key="show_when_off"${cfg(c, 'show_when_off') ? ' checked' : ''}>
-        Show a one-line Standby bar when the Lumagen is off (otherwise hide the card)</label>`;
-    const secBody = `
-      <p class="lmge-hint">Turn parts of the card on or off. Rows for entities that are disabled in the integration hide themselves and are listed in Admin.</p>
+        Show a one-line Standby bar when the Lumagen is off (otherwise hide the card)</label>
+      <div class="lmge-group">Sections</div>
+      <p class="lmge-hint">Status sits on top; every control is in a collapsed section so nothing changes by accident. Sections for entities that are disabled in the integration hide themselves and are listed under Admin.</p>
       ${SECTIONS.map(([k, n]) => `<label class="lmge-check"><input type="checkbox" data-key="${k}"${cfg(c, k) ? ' checked' : ''}>${n}</label>`).join('')}`;
     const screenBody = `
-      <p class="lmge-hint">Your screen, for the aspect visualizer and the third box of the signal chain.</p>
+      <p class="lmge-hint">Your screen, for the visualizer and the third box of the signal chain. The visualizer crops and stretches a picture exactly as the Lumagen does with its current settings.</p>
       <div class="lmge-row"><label class="lbl">Display name</label><input type="text" data-key="display_name" value="${esc(cfg(c, 'display_name'))}"></div>
       <div class="lmge-group">Screen shape</div>
-      <div class="lmge-row lmge-nowrap"><label class="lbl">Aspect</label>
-        <input type="range" data-key="display_aspect" min="1.33" max="2.76" step="0.01" value="${aspect}">
-        <span class="lmge-val" data-val="display_aspect">${aspect.toFixed(2)}</span></div>
-      <div class="lmge-presets">${ASPECT_PRESETS.map((p) => `<button class="lmge-preset${Math.abs(p - aspect) < 0.005 ? ' on' : ''}" data-preset="${p}">${p.toFixed(2)}</button>`).join('')}</div>`;
-    const colorBody = `
+      ${this._slider('display_aspect', 'Aspect', aspect, 1.33, 2.76, 0.01, '', (n) => Number(n).toFixed(2))}
+      <div class="lmge-presets">${ASPECT_PRESETS.map((p) => `<button class="lmge-preset${Math.abs(p - aspect) < 0.005 ? ' on' : ''}" data-preset="${p}">${p.toFixed(2)}</button>`).join('')}</div>
+      <div class="lmge-group">Visualizer</div>
+      <label class="lmge-check"><input type="checkbox" data-key="viz_after_only"${cfg(c, 'viz_after_only') ? ' checked' : ''}>
+        Only show the screen (result) and its description</label>
+      <div class="lmge-row"><label class="lbl">Picture</label><input type="text" data-key="scene_image" value="${esc(cfg(c, 'scene_image'))}" placeholder="Built-in landscape — or a URL, e.g. /local/beach.jpg"></div>`;
+    const iconBody = `
+      <p class="lmge-hint">Any Material Design icon — type just the name (e.g. <b>movie-open</b>); "mdi:" is added for you. Leave empty for the default.</p>
+      ${Object.keys(ICON_DEFAULTS).map((k) => `
+        <div class="lmge-row"><label class="lbl">${ICON_LABELS[k]}</label>
+          <ha-icon icon="${esc(iconFor(c, k))}"></ha-icon>
+          <input type="text" data-icon="${k}" value="${esc(((c.icons || {})[k] || '').replace(/^mdi:/, ''))}" placeholder="${ICON_DEFAULTS[k].replace(/^mdi:/, '')}"></div>`).join('')}`;
+    const looks = STYLE_GROUPS.map(([g, title, hint]) => this._sub(`look-${g}`, title, `
+      <p class="lmge-hint">${hint}</p>
+      ${STYLE_DEFS.filter((d) => d[1] === g).map(([key, , kind, label, def, min, max]) => (kind === 'size'
+        ? this._slider(key, label, st[key] !== undefined ? st[key] : def, min, max, 1, 'styles')
+        : this._colorControl(key, label, def, '#2196f3', 'styles'))).join('')}`)).join('')
+      + this._sub('look-context', 'Context colors', `
       <p class="lmge-hint">The card tints itself by context: the accent normally, the HDR color while HDR plays, the game color in game mode.</p>
-      ${COLOR_OPTS.map(([k, l, d, seed]) => this._colorControl(k, l, d, seed)).join('')}`;
+      ${CONTEXT_COLORS.map(([k, l, d, seed]) => this._colorControl(k, l, d, seed)).join('')}`);
     this.innerHTML = `<style>${EDITOR_CSS}</style>
       <div class="lmge">
         ${this._panel('device', 'mdi:video-input-hdmi', 'Device', deviceBody)}
-        ${this._panel('card', 'mdi:card-text-outline', 'Card', cardBody)}
-        ${this._panel('sections', 'mdi:view-list', 'Sections', secBody)}
-        ${this._panel('screen', 'mdi:projector-screen-outline', 'Screen', screenBody)}
-        ${this._panel('colors', 'mdi:palette', 'Colors', colorBody)}
+        ${this._panel('card', 'mdi:card-text-outline', 'Card & sections', cardBody)}
+        ${this._panel('screen', 'mdi:projector-screen-outline', 'Screen & visualizer', screenBody)}
+        ${this._panel('icons', 'mdi:emoticon-outline', 'Icons', iconBody)}
+        ${this._panel('look', 'mdi:palette', 'Appearance', `<p class="lmge-hint">Sizes and colors. Every color can follow your theme or be custom; "Back to default" (↺) resets a size.</p>${looks}`)}
         <div class="lmge-foot">Lumagen Card ${BUILD_NUMBER}</div>
       </div>`;
     this._rendered = true;
@@ -898,48 +1167,69 @@ class LumagenCardEditor extends HTMLElement {
   }
 
   _wire() {
-    this.querySelectorAll('details.lmge-sec').forEach((d) => d.addEventListener('toggle', () => {
+    this.querySelectorAll('details.lmge-sec, details.lmge-sub').forEach((d) => d.addEventListener('toggle', () => {
       if (d.open) this._open.add(d.dataset.panel); else this._open.delete(d.dataset.panel);
     }));
     this.querySelectorAll('[data-key]').forEach((el) => {
       const key = el.dataset.key;
       if (el.type === 'checkbox') el.addEventListener('change', () => this._set(key, el.checked));
-      else if (el.type === 'range') {
-        el.addEventListener('input', () => {
-          const out = this.querySelector(`[data-val="${key}"]`);
-          if (out) out.textContent = Number(el.value).toFixed(2);
-        });
-        el.addEventListener('change', () => { this._set(key, Number(el.value)); this._render(); });
-      } else if (el.tagName === 'SELECT') el.addEventListener('change', () => this._set(key, el.value));
-      else el.addEventListener('change', () => this._set(key, el.value));
+      else el.addEventListener('change', () => this._set(key, el.value.trim()));
     });
+    this.querySelectorAll('[data-skey]').forEach((el) => {
+      const key = el.dataset.skey;
+      const scope = el.dataset.scope;
+      const fmt = scope ? (n) => `${n}px` : (n) => Number(n).toFixed(2);
+      el.addEventListener('input', () => {
+        const out = this.querySelector(`[data-val="${scope}:${key}"]`);
+        if (out) out.textContent = fmt(el.value);
+      });
+      el.addEventListener('change', () => {
+        const n = Number(el.value);
+        if (scope) {
+          const def = STYLE_INDEX[key];
+          this._set(key, def && n === def[4] ? '' : n, scope);
+        } else this._set(key, n);
+        this._render();
+      });
+    });
+    this.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
+      this._set(b.dataset.reset, '', b.dataset.scope);
+      this._render();
+    }));
     this.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
       this._set('display_aspect', Number(b.dataset.preset));
       this._render();
     }));
+    this.querySelectorAll('[data-icon]').forEach((el) => el.addEventListener('change', () => {
+      this._set(el.dataset.icon, normalizeIcon(el.value) === ICON_DEFAULTS[el.dataset.icon] ? '' : normalizeIcon(el.value), 'icons');
+      this._render();
+    }));
     this.querySelectorAll('.lmge-cmode').forEach((sel) => sel.addEventListener('change', () => {
       const key = sel.dataset.ckey;
-      const cur = this._config[key] || '';
+      const scope = sel.dataset.scope;
+      const cur = this._get(key, scope) || '';
       const was = cur ? colorMode(cur) : 'default';
       let next = '';
       // Seed the new mode from the old value; never drop the user's color on a mode change.
       if (sel.value === 'theme') next = was === 'theme' ? cur : 'var(--primary-color)';
       else if (sel.value === 'custom') next = /^#[0-9a-fA-F]{6}$/.test(cur) ? cur : sel.dataset.seed;
       else if (sel.value === 'css') next = cur;
-      this._cmode[key] = sel.value;
-      this._set(key, next);
+      this._cmode[`${scope}:${key}`] = sel.value;
+      this._set(key, next, scope);
       this._render();
     }));
-    this.querySelectorAll('.lmge-ctheme').forEach((s) => s.addEventListener('change', () => this._set(s.dataset.ckey, s.value)));
-    this.querySelectorAll('.lmge-chex').forEach((i) => i.addEventListener('input', () => this._set(i.dataset.ckey, i.value)));
-    this.querySelectorAll('.lmge-ccss').forEach((i) => i.addEventListener('change', () => this._set(i.dataset.ckey, i.value.trim())));
+    const val = (sel, fn) => this.querySelectorAll(sel).forEach((el) => el.addEventListener(fn === 'input' ? 'input' : 'change',
+      () => this._set(el.dataset.ckey, el.value.trim(), el.dataset.scope)));
+    val('.lmge-ctheme', 'change');
+    val('.lmge-chex', 'input');
+    val('.lmge-ccss', 'change');
   }
 }
 
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
-  BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES,
-  normalizeConfig, rootStyleVars, resolveEntities, listDevices, parseAspect, fitRect, fmtVideo, chipLabel, colorMode,
+  BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
+  normalizeConfig, normalizeIcon, rootStyleVars, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, fmtVideo, chipLabel, colorMode,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);
@@ -950,7 +1240,7 @@ if (!window.customCards.some((c) => c.type === CARD_TAG)) {
   window.customCards.push({
     type: CARD_TAG,
     name: 'Lumagen Card',
-    description: 'Lumagen Radiance Pro: signal chain, aspect visualizer, HDR details, one-tap controls, remote and admin.',
+    description: 'Lumagen Radiance Pro: signal chain, aspect visualizer, HDR details, and collapsible aspect, remote, source, picture and admin controls.',
     preview: false,
     documentationURL: 'https://github.com/Ltek/lumagen-card',
   });

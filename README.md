@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.12.1** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.12.2** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -12,37 +12,39 @@ Current build: **v2026.10.12.1** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 ## What it shows
 
+Status sits on top. **Every control is in a collapsed section**, so nothing changes by accident; each collapsed header shows the current value.
+
 ```
- ⏻  Lumagen ●                                Apple TV · HDR · 2.40
+ ▣  Lumagen ●                                Apple TV · HDR · 2.40
  ┌ SOURCE ─────┐   ┌ LUMAGEN ───┐   ┌ JVC ───────┐
  │ Apple TV    │ › │ MEM D      │ › │ 2160p24    │
  │ 2160p24     │   │ HDR        │   │ BT.2020    │
  │ HDR 1000 nt │   │ Scope      │   │ 2.40       │
  └─────────────┘   └────────────┘   └────────────┘
  [HDR] [AUTO AR]
- ▭ source frame → ▭ your screen      Content 2.40 in 1.78 frame
-                                     Output 2.40 on 2.40 screen
+      [source picture]   →   [your screen]
+   Content 2.40 in 1.78    Content 2.40 · Output 2.40
+          frame                on 2.40 screen
  Mastered 1000 nits · MaxCLL 850  ████████████░░░
- Input   [Apple TV] [Kaleidescape] [Xbox] …
- Memory  [A] [B] [C] [D]
- Aspect  [Auto] [1.78] [2.40] …  NLS  Reset
- CMS     [Rec709] [HDR]      Style [Std] [Scope]
- › Menu remote
- › Admin & link
+ ▭ Aspect   2.40 · auto                           ›
+ ▦ Remote                                         ›
+ ⇥ Source   Apple TV · MEM D                      ›
+ ◐ Picture  HDR · Scope                           ›
+ ⚙ Admin & link                                   ›
 ```
 
-- **Header** — tap the power button to turn the Lumagen on; **hold** it to put it in standby (so a stray tap can't turn your movie off). The dot is the link: green = the Lumagen answers, red = link down. The summary turns red and reads *Offline* when the link drops.
-- **Standby** — the card collapses to one line instead of disappearing, so you can turn the Lumagen on from it. (Option: hide the card while off. It always shows while you edit the Dashboard.)
-- **Signal chain** — source → Lumagen → display. A 24 → 60 or HDR → SDR mismatch is obvious at a glance.
+- **Header** — the icon is the power button: tap to turn the Lumagen on, **hold** for standby (a stray tap can't stop your movie). The dot is the link: green = the Lumagen answers, red = link down; the summary reads *Offline* in red.
+- **Standby** — one line instead of disappearing, so you can power on from the card (or hide the card while off; it always shows while you edit the Dashboard).
+- **Signal chain** — source → Lumagen → display; a 24 → 60 or HDR → SDR mismatch is obvious at a glance.
 - **Tags** appear only when active: HDR, GAME, NLS, AUTO AR, 3D, NO SOURCE, TEST PATTERN, LINK DOWN.
-- **Aspect visualizer** — left: the source frame with the content drawn to scale (letterbox bars and all). Right: *your* screen shape with the image the Lumagen outputs. It animates as Auto Aspect switches.
-- **HDR panel** (HDR sources only) — mastering peak and minimum, and a MaxCLL bar relative to the mastering peak.
-- **Chips** — one tap for Input, Memory, Aspect ratio (+ NLS and Reset Auto Aspect), CMS and Style. They're built from the integration's own options, so your Lumagen labels appear automatically and the aspect list follows the integration's *Aspect ratio menu* option.
-- **Menu remote** (collapsed) — Menu / Exit / Clear / Help / OK and arrows; **hold an arrow to repeat it 5×**.
-- **Admin & link** (collapsed, **hold to run**) — Hotplug (all inputs), Restart outputs, Reload config, OSD test (shows your configured volume display at 42), Clear OSD, ALT; the link line shows reconnects, watchdog mode and the last disconnect reason.
-- **Context tint** — the accent color normally, the HDR color while HDR plays, the game color in game mode.
-
-Controls dim and stop responding while the Lumagen is in standby or the link is down; last-known values stay visible, dimmed.
+- **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **stretched into its output area exactly as the Lumagen does** — so a wrong setting shows the real crop or the bars you'd see. A caption is centered under each screen. Uses a built-in landscape, or your own picture. Option: show only the screen.
+- **HDR panel** (HDR sources) — mastering peak and minimum, and a MaxCLL bar.
+- **Aspect** — aspect chips (from the integration's *Aspect ratio menu* option), NLS and Reset auto aspect.
+- **Remote** — Menu / Exit / Clear / Help / OK and arrows; **hold an arrow to repeat it 5×**.
+- **Source** — input chips (your Lumagen labels) and memory A–D.
+- **Picture** — CMS and Style chips (your labels).
+- **Admin & link** (**hold to run**) — Hotplug, Restart outputs, Reload config, OSD test, Clear OSD, ALT; link health, and a list of integration entities that are still disabled.
+- **Context tint** — accent normally, HDR color while HDR plays, game color in game mode.
 
 ## Installation
 
@@ -71,7 +73,7 @@ The integration creates some entities **disabled by default**: CMS, Style, Reset
 
 ## Options
 
-All options are in the visual editor; YAML keys are only written when you change them from the default.
+Everything is in the visual editor (Device · Card & sections · Screen & visualizer · Icons · Appearance). YAML keys are only written when they differ from the default.
 
 | Key | Default | Description |
 |---|---|---|
@@ -79,18 +81,29 @@ All options are in the visual editor; YAML keys are only written when you change
 | `title` | `Lumagen` | Header title. |
 | `show_when_off` | `true` | `true`: one-line Standby bar while off. `false`: hide the card while off. |
 | `display_name` | `Display` | Heading of the third signal-chain box (e.g. your projector). |
-| `display_aspect` | `1.78` | Your screen shape for the visualizer (e.g. `2.40` for a scope screen). |
-| `show_chain` · `show_visualizer` · `show_hdr` · `show_inputs` · `show_memory` · `show_aspects` · `show_picture` · `show_remote` · `show_admin` | `true` | Turn sections off. |
-| `accent_color` · `hdr_color` · `game_color` | theme primary · amber · green | Any CSS color or theme variable, e.g. `var(--accent-color)`. |
+| `display_aspect` | `1.78` | Your screen shape (e.g. `2.40` for a scope screen). |
+| `viz_after_only` | `false` | Show only the screen (result) and its caption. |
+| `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
+| `show_chain` · `show_visualizer` · `show_hdr` · `show_aspects` · `show_remote` · `show_inputs` · `show_memory` · `show_picture` · `show_admin` | `true` | Turn parts off. |
+| `accent_color` · `hdr_color` · `game_color` | theme primary · amber · green | Context colors. |
+| `icons:` | | `header`, `aspect`, `remote`, `source`, `picture`, `admin` — any MDI name; `mdi:` is optional. |
+| `styles:` | | Sizes (px) and colors (any CSS color or theme variable) — see below. |
 
-Example — scope screen, no remote:
+**`styles:` keys** — sizes: `card_radius` `card_padding` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size`; colors: `card_background` `card_border_color` `box_background` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color`.
+
+Example — scope screen, bigger visualizer, custom icons:
 
 ```yaml
 type: custom:lumagen-card
 display_name: JVC NZ8
 display_aspect: 2.4
-show_remote: false
-hdr_color: var(--warning-color)
+icons:
+  header: movie-open
+  remote: remote-tv
+styles:
+  viz_height: 110
+  title_color: var(--accent-color)
+  card_background: "#0d1b2a"
 ```
 
 ## Credits
