@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.12.2
+// Version: v2026.10.12.3
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.12.2';
+const BUILD_NUMBER = 'v2026.10.12.3';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -109,6 +109,11 @@ const DEFAULTS = {
   device: '',
   title: 'Lumagen',
   show_when_off: true,
+  power_hold_on: false,
+  standby_text: 'below',
+  standby_button: false,
+  collapsible: false,
+  start_collapsed: false,
   display_name: 'Display',
   display_aspect: 1.78,
   viz_after_only: false,
@@ -165,6 +170,7 @@ const STYLE_DEFS = [
   ['card_radius', 'card', 'size', 'Corner radius', 12, 0, 32],
   ['card_padding', 'card', 'size', 'Padding', 12, 4, 28],
   ['box_background', 'card', 'color', 'Box & key background', 'Subtle grey'],
+  ['divider_color', 'card', 'color', 'Section divider color', 'Subtle grey'],
   ['header_icon_size', 'header', 'size', 'Icon size', 22, 14, 44],
   ['header_icon_color', 'header', 'color', 'Icon color (when on)', 'Context color'],
   ['title_size', 'header', 'size', 'Title size', 16, 11, 30],
@@ -203,6 +209,9 @@ const STYLE_GROUPS = [
   ['viz', 'Visualizer', 'Screen size and the caption under each screen.'],
 ];
 const STYLE_INDEX = Object.fromEntries(STYLE_DEFS.map((d) => [d[0], d]));
+// Backgrounds and borders also offer "Transparent".
+const TRANSPARENT_KEYS = new Set(['card_background', 'card_border_color', 'box_background', 'divider_color', 'chip_background', 'chip_border_color']);
+const STANDBY_TEXT = [['below', 'Below the title'], ['inline', 'Inline with the title'], ['hidden', 'Hidden']];
 
 function normalizeConfig(raw) {
   const c = raw && typeof raw === 'object' ? raw : {};
@@ -269,6 +278,15 @@ function rootStyleVars(config) {
     vars.push(`--lmg-${key.replace(/_/g, '-')}:${st[key]}${kind === 'size' ? 'px' : ''}`);
   });
   return vars.join(';');
+}
+
+/** Classes on the card root that depend on config (constant stylesheet, no interpolation). */
+function rootClasses(config) {
+  const st = config.styles || {};
+  const cls = ['lmg'];
+  if (st.card_border_color) cls.push('has-border');
+  if (st.card_background === 'transparent') cls.push('is-flat');
+  return cls.join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +375,8 @@ const CARD_CSS = `
   padding: var(--lmg-card-padding, 12px) calc(var(--lmg-card-padding, 12px) + 2px) calc(var(--lmg-card-padding, 12px) - 2px);
   overflow: hidden; background: var(--lmg-card-background, var(--ha-card-background, var(--card-background-color)));
   border-radius: var(--lmg-card-radius, var(--ha-card-border-radius, 12px)); }
-.lmg.has-border { border: 1px solid var(--lmg-card-border-color); }
+.lmg.has-border { border: var(--ha-card-border-width, 1px) solid var(--lmg-card-border-color); }
+.lmg.is-flat { box-shadow: none; }
 .lmg.is-hdr { --lmg-ctx: var(--lmg-hdr, #ffb300); }
 .lmg.is-game { --lmg-ctx: var(--lmg-game, #4caf50); }
 .lmg [hidden] { display: none !important; }
@@ -368,7 +387,7 @@ const CARD_CSS = `
   display: flex; align-items: center; justify-content: center; transition: background .2s, color .2s;
   --mdc-icon-size: var(--lmg-header-icon-size, 22px); }
 .lmg.is-on .lmg-power { color: var(--lmg-header-icon-color, var(--lmg-ctx)); background: color-mix(in srgb, var(--lmg-header-icon-color, var(--lmg-ctx)) 16%, transparent); }
-.lmg-title { display: flex; align-items: center; gap: 8px; font-size: var(--lmg-title-size, 16px); font-weight: 500; white-space: nowrap;
+.lmg-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--lmg-title-size, 16px); font-weight: 500; white-space: nowrap;
   color: var(--lmg-title-color, var(--primary-text-color)); }
 .lmg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--disabled-text-color, #777); }
 .lmg-dot.ok { background: var(--success-color, #4caf50); }
@@ -376,6 +395,16 @@ const CARD_CSS = `
 .lmg-summary { margin-left: auto; min-width: 0; font-size: var(--lmg-summary-size, 13px); color: var(--lmg-summary-color, var(--secondary-text-color));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lmg.is-down .lmg-summary { color: var(--error-color, #f44336); }
+.lmg-head.is-tap { cursor: pointer; }
+.lmg-hchev { color: var(--secondary-text-color); --mdc-icon-size: 20px; transition: transform .2s; flex: 0 0 auto; }
+.lmg.is-collapsed .lmg-hchev { transform: rotate(-90deg); }
+.lmg.is-collapsed .lmg-body { display: none; }
+.lmg-sb-inline { font-size: var(--lmg-secondary-size, 12px); font-weight: 400; color: var(--lmg-secondary-color, var(--secondary-text-color));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lmg-pwr2 { margin-left: auto; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--lmg-box); color: var(--lmg-header-icon-color, var(--lmg-ctx)); display: flex; align-items: center; justify-content: center;
+  --mdc-icon-size: 20px; }
+.lmg-pwr2:hover { background: color-mix(in srgb, var(--lmg-ctx) 20%, transparent); }
 .lmg-standby { padding: 2px 0 2px 46px; font-size: var(--lmg-secondary-size, 13px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-chain { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr); gap: 6px; margin-top: 10px; }
 .lmg-box { min-width: 0; padding: 8px 6px; border-radius: 10px; text-align: center; background: var(--lmg-box); }
@@ -408,7 +437,7 @@ const CARD_CSS = `
 .lmg-hdrp b { color: var(--lmg-text-color, var(--primary-text-color)); }
 .lmg-bar { position: relative; height: 6px; margin-top: 4px; border-radius: 3px; background: rgba(127,127,127,0.2); overflow: hidden; }
 .lmg-bar > span { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--lmg-hdr, #ffb300); transition: width .4s ease; }
-.lmg-fold { margin-top: 10px; border-top: 1px solid rgba(127,127,127,0.2); }
+.lmg-fold { margin-top: 10px; border-top: 1px solid var(--lmg-divider-color, rgba(127,127,127,0.2)); }
 .lmg-fold > summary { display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; cursor: pointer; list-style: none;
   font-size: var(--lmg-section-title-size, 14px); color: var(--lmg-section-title-color, var(--primary-text-color)); user-select: none; }
 .lmg-fold > summary::-webkit-details-marker { display: none; }
@@ -465,7 +494,11 @@ class LumagenCard extends HTMLElement {
 
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('Invalid configuration');
-    this._config = normalizeConfig(config);
+    const next = normalizeConfig(config);
+    if (cfg(next, 'start_collapsed') !== cfg(this._config, 'start_collapsed') || cfg(next, 'collapsible') !== cfg(this._config, 'collapsible')) {
+      this._collapsed = undefined; // re-apply the configured starting state
+    }
+    this._config = next;
     this._built = false;
     if (this._hass) this._build();
   }
@@ -500,15 +533,20 @@ class LumagenCard extends HTMLElement {
       `<button class="lmg-key ${cls}" data-tap="remote" data-cmd="${cmd}"${hold ? ' data-hold="remote-repeat"' : ''} aria-label="${cmd}">${inner}</button>`;
     const admin = (id, label) => `<button class="lmg-chip" data-hold="${id}" data-a="${id}">${label}</button>`;
     const afterOnly = cfg(c, 'viz_after_only');
+    const standbyText = `Standby · ${cfg(c, 'power_hold_on') ? 'hold' : 'tap'} the icon to power on`;
+    if (this._collapsed === undefined) this._collapsed = cfg(c, 'collapsible') && cfg(c, 'start_collapsed');
     this.innerHTML = `
       <style>${CARD_CSS}</style>
-      <ha-card class="lmg${c.styles && c.styles.card_border_color ? ' has-border' : ''}" style="${esc(rootStyleVars(c))}">
-        <div class="lmg-head">
-          <button class="lmg-power" data-tap="power" data-hold="power-off" aria-label="Power"><ha-icon icon="${esc(iconFor(c, 'header'))}"></ha-icon></button>
-          <div class="lmg-title"><span>${esc(cfg(c, 'title'))}</span><span class="lmg-dot" data-k="dot"></span></div>
+      <ha-card class="${rootClasses(c)}" style="${esc(rootStyleVars(c))}">
+        <div class="lmg-head${cfg(c, 'collapsible') ? ' is-tap' : ''}"${cfg(c, 'collapsible') ? ' data-tap="collapse"' : ''}>
+          <button class="lmg-power" data-tap="power" data-hold="power-hold" aria-label="Power"><ha-icon icon="${esc(iconFor(c, 'header'))}"></ha-icon></button>
+          <div class="lmg-title"><span>${esc(cfg(c, 'title'))}</span><span class="lmg-dot" data-k="dot"></span>
+            <span class="lmg-sb-inline" data-k="standby_inline" hidden>${standbyText}</span></div>
           <div class="lmg-summary" data-k="summary"></div>
+          <button class="lmg-pwr2" data-tap="power" data-hold="power-hold" data-k="pwr2" aria-label="Power on" hidden><ha-icon icon="mdi:power"></ha-icon></button>
+          <ha-icon class="lmg-hchev" data-k="hchev" icon="mdi:chevron-down" hidden></ha-icon>
         </div>
-        <div class="lmg-standby" data-k="standby" hidden>Standby · tap the icon to power on</div>
+        <div class="lmg-standby" data-k="standby" hidden>${standbyText}</div>
         <div class="lmg-body" data-k="body">
           <div data-sec="chain">
             <div class="lmg-chain">
@@ -626,7 +664,7 @@ class LumagenCard extends HTMLElement {
       if (press && press.el === el && press.held) return; // hold already ran
       if (el.dataset.opt !== undefined) { this._select(el.dataset.ent, el.dataset.opt); return; }
       if (el.dataset.tap) this._run(el.dataset.tap, el);
-      else if (el.dataset.hold) this._toast(el.dataset.hold === 'power-off' ? 'Hold to put the Lumagen in standby' : 'Hold to run');
+      else if (el.dataset.hold) this._toast('Hold to run');
     });
   }
 
@@ -649,12 +687,20 @@ class LumagenCard extends HTMLElement {
     const press = (k) => E[k] && this._call('button', 'press', { entity_id: E[k] });
     switch (action) {
       case 'power': {
-        const on = this._hass && E.power && this._hass.states[E.power] && this._hass.states[E.power].state === 'on';
-        if (on) this._toast('Hold to put the Lumagen in standby');
+        // Standby always needs a hold; turning on needs one only when power_hold_on is set.
+        if (this._isOn()) this._toast('Hold to put the Lumagen in standby');
+        else if (cfg(this._config, 'power_hold_on')) this._toast('Hold to turn the Lumagen on');
         else if (E.power) this._call('switch', 'turn_on', { entity_id: E.power });
         break;
       }
-      case 'power-off': if (E.power) this._call('switch', 'turn_off', { entity_id: E.power }); break;
+      case 'power-hold':
+        if (E.power) this._call('switch', this._isOn() ? 'turn_off' : 'turn_on', { entity_id: E.power });
+        break;
+      case 'collapse':
+        if (!this._isOn()) break;
+        this._collapsed = !this._collapsed;
+        this._applyCollapse();
+        break;
       case 'remote': if (remote) this._call('remote', 'send_command', { entity_id: remote, command: el.dataset.cmd }); break;
       case 'remote-repeat':
         if (remote) this._call('remote', 'send_command', { entity_id: remote, command: el.dataset.cmd, num_repeats: 5, delay_secs: 0.15 });
@@ -671,11 +717,26 @@ class LumagenCard extends HTMLElement {
     }
   }
 
+  _isOn() {
+    const E = this._ents || {};
+    return !!(this._hass && E.power && this._hass.states[E.power] && this._hass.states[E.power].state === 'on');
+  }
+
+  _applyCollapse() {
+    if (!this._built) return;
+    const can = cfg(this._config, 'collapsible') && this._powerState === 'on';
+    // Like HA's Conditional card: never hide content while the Dashboard is being edited.
+    const collapsed = can && !!this._collapsed && !this._editMode && !this._preview;
+    this._root.classList.toggle('is-collapsed', collapsed);
+    this._k.hchev.hidden = !can;
+  }
+
   // -- visibility -------------------------------------------------------------
   _applyVisibility() {
     if (!this._built) return;
     const hide = !cfg(this._config, 'show_when_off') && this._powerState === 'off' && !this._editMode && !this._preview;
     this.style.display = hide ? 'none' : '';
+    this._applyCollapse();
   }
 
   // -- live patching ----------------------------------------------------------
@@ -720,8 +781,14 @@ class LumagenCard extends HTMLElement {
       : isDown ? 'Offline'
         : !isOn ? 'Standby'
           : [v('input_label'), v('src_dr'), v('out_aspect')].filter(okState).join(' · ');
-    set('summary', summary);
-    K.standby.hidden = !found || isOn || isDown;
+    const standby = found && !isOn && !isDown;
+    const sbMode = cfg(c, 'standby_text');
+    const sbButton = standby && cfg(c, 'standby_button');
+    set('summary', sbButton ? '' : summary);
+    K.summary.hidden = sbButton;
+    K.pwr2.hidden = !sbButton;
+    K.standby_inline.hidden = !(standby && sbMode === 'inline');
+    K.standby.hidden = !(standby && sbMode === 'below');
     K.body.hidden = !found || (!isOn && !isDown);
 
     // sections on/off (config) + entity availability
@@ -897,9 +964,10 @@ const CONTEXT_COLORS = [
 ];
 const ASPECT_PRESETS = [1.33, 1.78, 1.85, 2.0, 2.2, 2.35, 2.4];
 
-function colorMode(cur) {
+function colorMode(cur, allowTransparent = false) {
   cur = cur == null ? '' : String(cur);
   if (cur === '') return 'default';
+  if (allowTransparent && cur === 'transparent') return 'transparent';
   if (/^#[0-9a-fA-F]{3,8}$/.test(cur)) return 'custom';
   if (/^var\(/.test(cur) && THEME_COLORS.some(([v]) => v === cur)) return 'theme';
   return 'css';
@@ -1081,7 +1149,8 @@ class LumagenCardEditor extends HTMLElement {
     const id = `${scope}:${key}`;
     // The mode picked in this editor session wins (e.g. Custom CSS holding a listed theme var);
     // otherwise classify the stored value.
-    const mode = this._cmode[id] || (cur ? colorMode(cur) : 'default');
+    const canClear = scope === 'styles' && TRANSPARENT_KEYS.has(key);
+    const mode = this._cmode[id] || (cur ? colorMode(cur, canClear) : 'default');
     const data = `data-ckey="${key}" data-scope="${scope}"`;
     let field = '';
     if (mode === 'theme') {
@@ -1092,7 +1161,8 @@ class LumagenCardEditor extends HTMLElement {
     } else if (mode === 'css') {
       field = `<input type="text" class="lmge-ccss" ${data} value="${esc(cur)}" placeholder="e.g. tomato, rgba(…), var(--my-color)">`;
     }
-    const modes = [['default', defaultLabel], ['theme', 'Theme color'], ['custom', 'Custom color'], ['css', 'Custom CSS']];
+    const modes = [['default', defaultLabel], ...(canClear ? [['transparent', 'Transparent']] : []),
+      ['theme', 'Theme color'], ['custom', 'Custom color'], ['css', 'Custom CSS']];
     return `<div class="lmge-row"><label class="lbl">${label}</label><div class="lmge-color">
       <select class="lmge-cmode" ${data} data-seed="${seedHex}">${modes.map(([m, n]) => `<option value="${m}"${m === mode ? ' selected' : ''}>${n}</option>`).join('')}</select>
       ${field}</div></div>`;
@@ -1121,11 +1191,26 @@ class LumagenCardEditor extends HTMLElement {
           ${devices.map((d) => `<option value="${esc(d.id)}"${d.id === dev ? ' selected' : ''}>${esc(d.name)}</option>`).join('')}
           ${dev && !devices.some((d) => d.id === dev) ? `<option value="${esc(dev)}" selected>${esc(dev)} (not found)</option>` : ''}
         </select></div>`;
+    const sbMode = cfg(c, 'standby_text');
     const cardBody = `
-      <p class="lmge-hint">Header title and what the card does while the Lumagen is off.</p>
+      <p class="lmge-hint">Header title, the power button, what the card does while the Lumagen is off, and collapsing.</p>
       <div class="lmge-row"><label class="lbl">Title</label><input type="text" data-key="title" value="${esc(cfg(c, 'title'))}"></div>
+      <div class="lmge-group">Power & standby</div>
+      <p class="lmge-hint">The header icon is the power button. Standby always needs a press-and-hold.</p>
+      <label class="lmge-check"><input type="checkbox" data-key="power_hold_on"${cfg(c, 'power_hold_on') ? ' checked' : ''}>
+        Require a hold to turn on too</label>
       <label class="lmge-check"><input type="checkbox" data-key="show_when_off"${cfg(c, 'show_when_off') ? ' checked' : ''}>
-        Show a one-line Standby bar when the Lumagen is off (otherwise hide the card)</label>
+        Show the card while the Lumagen is off (otherwise hide it)</label>
+      ${cfg(c, 'show_when_off') ? `
+      <div class="lmge-row"><label class="lbl">Standby message</label>
+        <select data-key="standby_text">${STANDBY_TEXT.map(([v, n]) => `<option value="${v}"${v === sbMode ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <label class="lmge-check"><input type="checkbox" data-key="standby_button"${cfg(c, 'standby_button') ? ' checked' : ''}>
+        In standby, show a power button on the right instead of the word "Standby"</label>` : ''}
+      <div class="lmge-group">Collapse</div>
+      <label class="lmge-check"><input type="checkbox" data-key="collapsible"${cfg(c, 'collapsible') ? ' checked' : ''}>
+        Tap the header to collapse the card to just the header (while the Lumagen is on)</label>
+      ${cfg(c, 'collapsible') ? `<label class="lmge-check"><input type="checkbox" data-key="start_collapsed"${cfg(c, 'start_collapsed') ? ' checked' : ''}>
+        Start collapsed</label>` : ''}
       <div class="lmge-group">Sections</div>
       <p class="lmge-hint">Status sits on top; every control is in a collapsed section so nothing changes by accident. Sections for entities that are disabled in the integration hide themselves and are listed under Admin.</p>
       ${SECTIONS.map(([k, n]) => `<label class="lmge-check"><input type="checkbox" data-key="${k}"${cfg(c, k) ? ' checked' : ''}>${n}</label>`).join('')}`;
@@ -1172,7 +1257,8 @@ class LumagenCardEditor extends HTMLElement {
     }));
     this.querySelectorAll('[data-key]').forEach((el) => {
       const key = el.dataset.key;
-      if (el.type === 'checkbox') el.addEventListener('change', () => this._set(key, el.checked));
+      const reveals = ['show_when_off', 'collapsible'].includes(key);
+      if (el.type === 'checkbox') el.addEventListener('change', () => { this._set(key, el.checked); if (reveals) this._render(); });
       else el.addEventListener('change', () => this._set(key, el.value.trim()));
     });
     this.querySelectorAll('[data-skey]').forEach((el) => {
@@ -1211,9 +1297,10 @@ class LumagenCardEditor extends HTMLElement {
       const was = cur ? colorMode(cur) : 'default';
       let next = '';
       // Seed the new mode from the old value; never drop the user's color on a mode change.
-      if (sel.value === 'theme') next = was === 'theme' ? cur : 'var(--primary-color)';
+      if (sel.value === 'transparent') next = 'transparent';
+      else if (sel.value === 'theme') next = was === 'theme' ? cur : 'var(--primary-color)';
       else if (sel.value === 'custom') next = /^#[0-9a-fA-F]{6}$/.test(cur) ? cur : sel.dataset.seed;
-      else if (sel.value === 'css') next = cur;
+      else if (sel.value === 'css') next = cur === 'transparent' ? '' : cur;
       this._cmode[`${scope}:${key}`] = sel.value;
       this._set(key, next, scope);
       this._render();
@@ -1229,7 +1316,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  normalizeConfig, normalizeIcon, rootStyleVars, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, fmtVideo, chipLabel, colorMode,
+  normalizeConfig, normalizeIcon, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, fmtVideo, chipLabel, colorMode,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);

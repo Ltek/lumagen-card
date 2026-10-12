@@ -1,5 +1,13 @@
 # Changelog
 
+## v2026.10.12.3
+
+- **Transparent** option for every background and border: card background, card border, box & remote-key background, section dividers (new), chip background and chip border. A transparent card background also drops the card shadow.
+- **Power button:** option to require a press-and-hold to turn **on** as well (standby always needs a hold). The standby message says "hold" or "tap" accordingly.
+- **Collapse to the header:** option to tap the header to collapse/expand the card while the Lumagen is on, and an option to start collapsed. A chevron shows the state; the power button still works normally. Never collapsed while you edit the Dashboard.
+- **Standby message:** below the title (default), inline with the title, or hidden.
+- **Standby power button:** option to replace the right-hand word "Standby" with a power button that turns the Lumagen on.
+
 ## v2026.10.12.2
 
 - **Every control is now in a collapsible section** (collapsed by default) so nothing changes by accident: Aspect, Remote, Source (inputs + memory), Picture (CMS + Style), Admin & link. Status stays on top. Each collapsed header shows the current value (e.g. "Aspect 2.40 · auto").
