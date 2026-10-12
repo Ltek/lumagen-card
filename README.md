@@ -4,7 +4,7 @@ A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the
 
 Current build: **v2026.10.12.1** · full history in [CHANGELOG.md](CHANGELOG.md)
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=dashboard)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
 > Requires the **Lumagen integration**: [Ltek/lumagen](https://github.com/Ltek/lumagen) for every feature, or the original [jaysoffian/ha-lumagen](https://github.com/jaysoffian/ha-lumagen) by Jay Soffian, on which it is built (link health, hotplug, OSD test, CMS/Style, game mode and HDR metadata then hide themselves).
 
