@@ -1,5 +1,11 @@
 # Changelog
 
+## v2026.10.12.4
+
+- **Link dot:** show or hide it, and choose where it goes — right of the title (default), far right, or in place of the header icon (it is then the power button).
+- **Standby message:** your own text (an empty box reverts to the stock "Standby · tap the icon to power on"), and a slider for its indent.
+- **Hide individual buttons** in the Aspect (each ratio, NLS, Reset auto), Input and Memory sections — new **Buttons** panel in the editor, listing your Lumagen's actual options.
+
 ## v2026.10.12.3
 
 - **Transparent** option for every background and border: card background, card border, box & remote-key background, section dividers (new), chip background and chip border. A transparent card background also drops the card shadow.

@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.12.3** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.12.4** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -74,7 +74,7 @@ The integration creates some entities **disabled by default**: CMS, Style, Reset
 
 ## Options
 
-Everything is in the visual editor (Device · Card & sections · Screen & visualizer · Icons · Appearance). YAML keys are only written when they differ from the default.
+Everything is in the visual editor (Device · Card & sections · Screen & visualizer · Buttons · Icons · Appearance). YAML keys are only written when they differ from the default.
 
 | Key | Default | Description |
 |---|---|---|
@@ -82,6 +82,10 @@ Everything is in the visual editor (Device · Card & sections · Screen & visual
 | `title` | `Lumagen` | Header title. |
 | `show_when_off` | `true` | `true`: show the card (header only) while off. `false`: hide the card while off. |
 | `standby_text` | `below` | Standby message "Standby · tap the icon to power on": `below` the title, `inline` with it, or `hidden`. |
+| `standby_message` | stock text | Your own standby message; empty = "Standby · tap the icon to power on". |
+| `show_dot` | `true` | Show the link dot. |
+| `dot_position` | `title` | `title` (right of the title), `right` (far right), or `icon` (replaces the header icon; it is then the power button). |
+| `hide_aspects` · `hide_inputs` · `hide_memory` | | Buttons to hide — aspect ratios as shown (plus `nls`, `reset`), input numbers (e.g. `[3, 7]`), memory letters (e.g. `[A, C]`). The editor's **Buttons** panel lists your Lumagen's options. |
 | `standby_button` | `false` | In standby, replace the right-hand "Standby" with a power button that turns the Lumagen on. |
 | `power_hold_on` | `false` | Require a press-and-hold to turn **on** too (standby always needs a hold). |
 | `collapsible` | `false` | Tap the header to collapse the card to just the header while the Lumagen is on. |
@@ -95,7 +99,7 @@ Everything is in the visual editor (Device · Card & sections · Screen & visual
 | `icons:` | | `header`, `aspect`, `remote`, `source`, `picture`, `admin` — any MDI name; `mdi:` is optional. |
 | `styles:` | | Sizes (px) and colors (any CSS color or theme variable) — see below. |
 
-**`styles:` keys** — sizes: `card_radius` `card_padding` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size`; colors: `card_background` `card_border_color` `box_background` `divider_color` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color`.
+**`styles:` keys** — sizes: `card_radius` `card_padding` `standby_indent` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size`; colors: `card_background` `card_border_color` `box_background` `divider_color` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color`.
 
 Backgrounds and borders (`card_background`, `card_border_color`, `box_background`, `divider_color`, `chip_background`, `chip_border_color`) also accept `transparent` — the editor offers it as a choice.
 
