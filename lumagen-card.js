@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.8
+// Version: v2026.10.15.9
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.8';
+const BUILD_NUMBER = 'v2026.10.15.9';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -465,6 +465,26 @@ function chipLabel(option) {
   return ['Input', 'CMS', 'Style'].includes(m[1]) ? `${m[1]} ${m[2]}` : m[1];
 }
 
+/** Make `from`'s children match `to`'s (a parsed template) while keeping every element that is
+ *  still the same tag in place. The card is patched instead of rebuilt on each config change, so
+ *  the editor preview doesn't flash: icons, open sections and listeners stay. */
+function morphChildren(from, to) {
+  const a = [...from.childNodes];
+  const b = [...to.childNodes];
+  b.forEach((nb, i) => {
+    const na = a[i];
+    if (!na) { from.appendChild(nb); return; }
+    if (na.nodeType !== nb.nodeType || na.nodeName !== nb.nodeName) { from.replaceChild(nb, na); return; }
+    if (na.nodeType === 3 || na.nodeType === 8) { if (na.nodeValue !== nb.nodeValue) na.nodeValue = nb.nodeValue; return; }
+    if (na.nodeType !== 1) return;
+    [...na.attributes].forEach((at) => { if (!nb.hasAttribute(at.name)) na.removeAttribute(at.name); });
+    [...nb.attributes].forEach((at) => { if (na.getAttribute(at.name) !== at.value) na.setAttribute(at.name, at.value); });
+    if (na.localName === 'details') na.open = nb.hasAttribute('open');
+    morphChildren(na, nb.localName === 'template' ? nb.content : nb);
+  });
+  a.slice(b.length).forEach((n) => n.remove());
+}
+
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -625,6 +645,7 @@ class LumagenCard extends HTMLElement {
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('Invalid configuration');
     const next = normalizeConfig(config);
+    if (this._built && JSON.stringify(next) === JSON.stringify(this._config)) return;
     if (cfg(next, 'start_collapsed') !== cfg(this._config, 'start_collapsed') || cfg(next, 'collapsible') !== cfg(this._config, 'collapsible')) {
       this._collapsed = undefined; // re-apply the configured starting state
     }
@@ -670,6 +691,25 @@ class LumagenCard extends HTMLElement {
   }
 
   // -- build once -----------------------------------------------------------
+  /** First build: plain innerHTML. Later: patch the existing DOM (see morphChildren). */
+  _setHTML(html) {
+    if (!this.querySelector('ha-card')) { this.innerHTML = html; return; }
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    morphChildren(this, tpl.content);
+  }
+
+  /** True the first time for this element + key: listeners survive a patch, so bind them once. */
+  _once(el, key) {
+    if (!el) return false;
+    if (!this._wired) this._wired = new WeakMap();
+    const done = this._wired.get(el) || new Set();
+    if (done.has(key)) return false;
+    done.add(key);
+    this._wired.set(el, done);
+    return true;
+  }
+
   _build() {
     const c = this._config;
     const fold = (sec, iconKey, label, body) => `
@@ -759,7 +799,7 @@ class LumagenCard extends HTMLElement {
             <div class="lmg-note" data-k="link"></div>
             <div class="lmg-note" data-k="missing"></div>`),
     };
-    this.innerHTML = `
+    this._setHTML(`
       <style>${CARD_CSS}</style>
       <ha-card class="${rootClasses(c)}" style="${esc(rootStyleVars(c))}">
         <div class="lmg-head${cfg(c, 'collapsible') ? ' is-tap' : ''}"${cfg(c, 'collapsible') ? ' data-tap="collapse"' : ''}>
@@ -774,7 +814,7 @@ class LumagenCard extends HTMLElement {
         <div class="lmg-body" data-k="body">
           ${normalizeOrder(c.section_order).map((id) => parts[id]).join('')}
         </div>
-      </ha-card>`;
+      </ha-card>`);
     this._root = this.querySelector('.lmg');
     this._k = {};
     this.querySelectorAll('[data-k]').forEach((el) => { this._k[el.dataset.k] = el; });
@@ -786,10 +826,10 @@ class LumagenCard extends HTMLElement {
       this._v[k].setAttribute('href', scene);
       this._v[k].setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', scene);
     });
-    this.querySelectorAll('details.lmg-fold').forEach((d) => d.addEventListener('toggle', () => {
+    this.querySelectorAll('details.lmg-fold').forEach((d) => this._once(d, 'toggle') && d.addEventListener('toggle', () => {
       if (d.open) this._open.add(d.dataset.sec); else this._open.delete(d.dataset.sec);
     }));
-    this._bind();
+    if (this._once(this._root, 'bind')) this._bind();
     this._built = true;
     this._sig = '';
     this._optSig = {};
@@ -1557,9 +1597,10 @@ class LumagenCardEditor extends HTMLElement {
       <label class="lmge-check"><input type="checkbox" data-key="collapsible"${cfg(c, 'collapsible') ? ' checked' : ''}>
         Tap the header to collapse the card to just the header (while the Lumagen is on)</label>
       ${cfg(c, 'collapsible') ? `<label class="lmge-check"><input type="checkbox" data-key="start_collapsed"${cfg(c, 'start_collapsed') ? ' checked' : ''}>
-        Start collapsed</label>` : ''}
-      <div class="lmge-group">Sections</div>
+        Start collapsed</label>` : ''}`;
+    const sectionsBody = `
       <p class="lmge-hint">Order and show/hide the parts of the card. Controls always live in collapsible sections so nothing changes by accident; sections for entities that are disabled in the integration hide themselves.</p>
+      <p class="lmge-hint">Use the <b>pencil</b> on a section to rename it, hide single settings, or show its settings inside another section.</p>
       ${this._sectionList()}`;
     const screenBody = `
       <p class="lmge-hint">Your screen, for the visualizer and the third box of the signal chain. The visualizer crops and stretches a picture exactly as the Lumagen does with its current settings.</p>
@@ -1588,7 +1629,8 @@ class LumagenCardEditor extends HTMLElement {
     this.innerHTML = `<style>${EDITOR_CSS}</style>
       <div class="lmge">
         ${this._panel('device', 'mdi:video-input-hdmi', 'Device', deviceBody)}
-        ${this._panel('card', 'mdi:card-text-outline', 'Card & sections', cardBody)}
+        ${this._panel('card', 'mdi:card-text-outline', 'Card', cardBody)}
+        ${this._panel('sections', 'mdi:view-agenda-outline', 'Sections', sectionsBody)}
         ${this._panel('screen', 'mdi:projector-screen-outline', 'Screen & visualizer', screenBody)}
         ${this._panel('buttons', 'mdi:gesture-tap-button', 'Buttons', this._buttonsBody())}
         ${this._panel('icons', 'mdi:emoticon-outline', 'Icons', iconBody)}
