@@ -1,5 +1,11 @@
 # Changelog
 
+## v2026.10.15.6
+
+- **Editor preview is never collapsed.** With *Start collapsed* on, the card in the card editor and on a Dashboard in edit mode now always shows expanded. It no longer relies on Home Assistant passing a preview flag to the card, which it doesn't always do.
+- **Eye icons instead of checkboxes** for show/hide, per the design guide: every row in *Sections* and every button in the *Buttons* panel. Eye-off rows are dimmed.
+- **Source now has its own show/hide** (`show_source`), like every other section. Its Inputs and Memory rows can still be hidden separately.
+
 ## v2026.10.15.5
 
 - **Reorder the card's sections.** The editor's *Sections* list (Card & sections panel) now shows every part of the card — signal chain, visualizer, HDR details, Aspect, Remote, Source, Picture, Admin — with ↑/↓ to move it and a Show checkbox (Source has separate Inputs / Memory boxes). Status parts and control sections can be mixed in any order. *Reset to default order* appears once the order has been changed. YAML: `section_order`.

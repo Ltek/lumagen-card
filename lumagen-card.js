@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.5
+// Version: v2026.10.15.6
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.5';
+const BUILD_NUMBER = 'v2026.10.15.6';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -126,6 +126,7 @@ const DEFAULTS = {
   show_hdr: true,
   show_aspects: true,
   show_remote: true,
+  show_source: true,
   show_inputs: true,
   show_memory: true,
   show_picture: true,
@@ -141,7 +142,7 @@ const SECTIONS = [
   ['hdr', 'HDR details (HDR sources only)', 'mdi:brightness-7', ['show_hdr']],
   ['aspects', 'Aspect', 'icon:aspect', ['show_aspects']],
   ['remote', 'Remote', 'icon:remote', ['show_remote']],
-  ['source', 'Source', 'icon:source', ['show_inputs', 'show_memory']],
+  ['source', 'Source', 'icon:source', ['show_source']],
   ['picture', 'Picture (CMS & Style)', 'icon:picture', ['show_picture']],
   ['admin', 'Admin & link', 'icon:admin', ['show_admin']],
 ];
@@ -234,6 +235,8 @@ const HIDE_LISTS = {
   hide_inputs: { entity: 'input', id: (o) => { const m = /\((\d+)\)$/.exec(o); return m ? Number(m[1]) : o; } },
   hide_memory: { entity: 'memory', id: (o) => String(o).replace(/^MEM/, '') },
 };
+// Ancestors that mean "the Dashboard is being edited / this is the editor preview".
+const EDITOR_WRAPPERS = ['hui-card-preview', 'hui-dialog-edit-card', 'hui-card-edit-mode', 'hui-card-options', 'hui-section-edit-mode'];
 const STANDBY_TEXT = [['below', 'Below the title'], ['inline', 'Inline with the title'], ['hidden', 'Hidden']];
 
 function normalizeConfig(raw) {
@@ -559,6 +562,25 @@ class LumagenCard extends HTMLElement {
   set editMode(v) { this._editMode = !!v; this._applyVisibility(); }
   set preview(v) { this._preview = !!v; this._applyVisibility(); }
 
+  connectedCallback() { this._applyVisibility(); }
+
+  /**
+   * True while the Dashboard is being edited or this card is the editor preview.
+   * HA does not always pass `preview` / `editMode` to the card element, so also
+   * look for the editor's wrappers among the ancestors (crossing shadow roots).
+   */
+  _editing() {
+    if (this._editMode || this._preview) return true;
+    let n = this.parentNode || (this.getRootNode && this.getRootNode().host);
+    for (let i = 0; n && i < 40; i++) {
+      const tag = (n.localName || '').toLowerCase();
+      if (EDITOR_WRAPPERS.includes(tag)) return true;
+      if (n.hasAttribute && (n.hasAttribute('preview') || n.hasAttribute('edit-mode'))) return true;
+      n = n.parentNode || n.host;
+    }
+    return false;
+  }
+
   getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, min_columns: 6, rows: 'auto' }; }
 
@@ -784,7 +806,7 @@ class LumagenCard extends HTMLElement {
     if (!this._built) return;
     const can = cfg(this._config, 'collapsible') && this._powerState === 'on';
     // Like HA's Conditional card: never hide content while the Dashboard is being edited.
-    const collapsed = can && !!this._collapsed && !this._editMode && !this._preview;
+    const collapsed = can && !!this._collapsed && !this._editing();
     this._root.classList.toggle('is-collapsed', collapsed);
     this._k.hchev.hidden = !can;
   }
@@ -792,7 +814,7 @@ class LumagenCard extends HTMLElement {
   // -- visibility -------------------------------------------------------------
   _applyVisibility() {
     if (!this._built) return;
-    const hide = !cfg(this._config, 'show_when_off') && this._powerState === 'off' && !this._editMode && !this._preview;
+    const hide = !cfg(this._config, 'show_when_off') && this._powerState === 'off' && !this._editing();
     this.style.display = hide ? 'none' : '';
     this._applyCollapse();
   }
@@ -856,7 +878,7 @@ class LumagenCard extends HTMLElement {
     // sections on/off (config) + entity availability
     this.querySelectorAll('[data-sec]').forEach((el) => {
       const sec = el.dataset.sec;
-      let show = sec === 'source' ? (cfg(c, 'show_inputs') || cfg(c, 'show_memory')) : cfg(c, 'show_' + sec);
+      let show = sec === 'source' ? cfg(c, 'show_source') && (cfg(c, 'show_inputs') || cfg(c, 'show_memory')) : cfg(c, 'show_' + sec);
       if (sec === 'remote') show = show && !!E.remote;
       if (sec === 'aspects') show = show && !!E.aspect;
       if (sec === 'source') show = show && !!(E.input || E.memory);
@@ -1029,6 +1051,13 @@ const CONTEXT_COLORS = [
 ];
 const ASPECT_PRESETS = [1.33, 1.78, 1.85, 2.0, 2.2, 2.35, 2.4];
 
+/** Eye show/hide toggle (design system: show/hide is an eye icon, never a checkbox). */
+function eyeToggle(key, on, label = '', extra = '') {
+  const what = label || 'section';
+  return `<button class="lmge-act lmge-eye${on ? '' : ' off'}${label ? ' lbl' : ''}" data-eye="${key}"${extra} aria-pressed="${on}"
+    title="${on ? 'Hide' : 'Show'} ${esc(what)}"><ha-icon icon="${on ? 'mdi:eye-outline' : 'mdi:eye-off-outline'}"></ha-icon>${label ? `<span>${esc(label)}</span>` : ''}</button>`;
+}
+
 function colorMode(cur, allowTransparent = false) {
   cur = cur == null ? '' : String(cur);
   if (cur === '') return 'default';
@@ -1154,8 +1183,15 @@ const EDITOR_CSS = `
         .lmge-sname { flex: 1 1 auto; min-width: 0; color: var(--ltek-c-text); font-size: var(--ltek-fs-label); font-weight: var(--ltek-fw-normal);
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .lmge-sctl { display: flex; gap: var(--ltek-sp-3); flex: 0 0 auto; }
-        .lmge-mini { display: flex; align-items: center; gap: var(--ltek-sp-1); color: var(--ltek-c-label); font-size: var(--ltek-fs-small); cursor: pointer; }
-        .lmge-mini input { accent-color: var(--ltek-c-accent); margin: 0; }
+        .lmge-eye.off { color: var(--ltek-c-muted); }
+        .lmge-eye.lbl { gap: var(--ltek-sp-1); align-items: center; font-size: var(--ltek-fs-small); color: var(--ltek-c-label); }
+        .lmge-eye.lbl.off { color: var(--ltek-c-muted); }
+        .lmge-eye.lbl.off span { text-decoration: line-through; }
+        .lmge-blist { display: flex; flex-direction: column; }
+        .lmge-brow { display: flex; align-items: center; gap: var(--ltek-sp-2); padding: var(--ltek-sp-1) var(--ltek-sp-1);
+          border-top: 1px solid var(--ltek-c-border-soft); }
+        .lmge-brow:first-child { border-top: none; }
+        .lmge-brow.off .lmge-sname { color: var(--ltek-c-muted); }
         .lmge-act { border: none; background: none; padding: 0; color: var(--ltek-c-icon); cursor: pointer; display: flex; }
         .lmge-act:hover:not([disabled]) { color: var(--ltek-c-icon-hover); }
         .lmge-act[disabled] { opacity: .25; cursor: default; }
@@ -1265,17 +1301,18 @@ class LumagenCardEditor extends HTMLElement {
     const rows = order.map((id, i) => {
       const [, name, icon, keys] = SECTIONS.find((x) => x[0] === id);
       const ic = icon.startsWith('icon:') ? iconFor(c, icon.slice(5)) : icon;
-      const shown = keys.some((k) => cfg(c, k));
-      const toggles = id === 'source'
-        ? `<label class="lmge-mini"><input type="checkbox" data-key="show_inputs"${cfg(c, 'show_inputs') ? ' checked' : ''}>Inputs</label>
-           <label class="lmge-mini"><input type="checkbox" data-key="show_memory"${cfg(c, 'show_memory') ? ' checked' : ''}>Memory</label>`
-        : `<label class="lmge-mini" title="Show"><input type="checkbox" data-key="${keys[0]}"${shown ? ' checked' : ''}>Show</label>`;
+      const shown = cfg(c, keys[0]);
+      // Source also lets you hide its Inputs or Memory row on their own.
+      const parts = id === 'source'
+        ? `<span class="lmge-sctl">${eyeToggle('show_inputs', cfg(c, 'show_inputs'), 'Inputs')}${eyeToggle('show_memory', cfg(c, 'show_memory'), 'Memory')}</span>`
+        : '';
       return `<div class="lmge-srow${shown ? '' : ' off'}" data-sid="${id}">
         <ha-icon class="lmge-sicon" icon="${esc(ic)}"></ha-icon>
         <span class="lmge-sname">${esc(name)}</span>
-        <span class="lmge-sctl">${toggles}</span>
+        ${parts}
         <button class="lmge-act" data-move="-1" data-sid="${id}" title="Move up"${i === 0 ? ' disabled' : ''}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
         <button class="lmge-act" data-move="1" data-sid="${id}" title="Move down"${i === order.length - 1 ? ' disabled' : ''}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+        ${eyeToggle(keys[0], shown)}
       </div>`;
     }).join('');
     return `<div class="lmge-slist">${rows}</div>
@@ -1292,11 +1329,15 @@ class LumagenCardEditor extends HTMLElement {
       const hidden = hiddenSet(c, key);
       const items = [...opts.map((o) => [def.id(o), labelFn(o)]), ...(def.extra || [])];
       const body = items.length
-        ? items.map(([val, label]) => `<label class="lmge-check"><input type="checkbox" data-hide="${key}" data-hval='${esc(JSON.stringify(val))}'${hidden.has(JSON.stringify(val)) ? '' : ' checked'}>${esc(label)}</label>`).join('')
+        ? `<div class="lmge-blist">${items.map(([val, label]) => {
+          const on = !hidden.has(JSON.stringify(val));
+          return `<div class="lmge-brow${on ? '' : ' off'}"><span class="lmge-sname">${esc(label)}</span>
+            ${eyeToggle('', on, '', ` data-hide="${key}" data-hval='${esc(JSON.stringify(val))}'`).replace(' data-eye=""', '')}</div>`;
+        }).join('')}</div>`
         : '<p class="lmge-hint">Not available — the entity is missing or the Lumagen is not connected.</p>';
       return this._sub(`btn-${key}`, title, body);
     };
-    return `<p class="lmge-hint">Untick a button to hide it from the card. The lists come from your Lumagen (labels) and the integration's aspect ratio menu.</p>
+    return `<p class="lmge-hint">Use the eye to hide a button from the card. The lists come from your Lumagen (labels) and the integration's aspect ratio menu.</p>
       ${group('Aspect', 'hide_aspects', (o) => o)}
       ${group('Input', 'hide_inputs', (o) => chipLabel(o))}
       ${group('Memory', 'hide_memory', (o) => String(o).replace(/^MEM/, 'Memory '))}`;
@@ -1428,13 +1469,21 @@ class LumagenCardEditor extends HTMLElement {
       this._emit();
       this._render();
     }));
-    this.querySelectorAll('[data-hide]').forEach((el) => el.addEventListener('change', () => {
-      const key = el.dataset.hide;
-      const val = JSON.parse(el.dataset.hval);
-      const list = (this._config[key] || []).filter((v) => JSON.stringify(v) !== JSON.stringify(val));
-      if (!el.checked) list.push(val);
+    this.querySelectorAll('[data-eye]').forEach((b) => b.addEventListener('click', () => {
+      const key = b.dataset.eye;
+      this._set(key, !cfg(this._config, key));
+      this._render();
+    }));
+    this.querySelectorAll('[data-hide]').forEach((b) => b.addEventListener('click', () => {
+      const key = b.dataset.hide;
+      const val = JSON.parse(b.dataset.hval);
+      const was = (this._config[key] || []);
+      const isHidden = was.some((v) => JSON.stringify(v) === JSON.stringify(val));
+      const list = was.filter((v) => JSON.stringify(v) !== JSON.stringify(val));
+      if (!isHidden) list.push(val);
       if (list.length) this._config[key] = list; else delete this._config[key];
       this._emit();
+      this._render();
     }));
     this.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
       this._set(b.dataset.reset, '', b.dataset.scope);

@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.5** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.15.6** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -95,7 +95,8 @@ Everything is in the visual editor (Device · Card & sections · Screen & visual
 | `viz_after_only` | `false` | Show only the screen (result) and its caption. |
 | `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
 | `section_order` | default order | Order of the card's parts: any of `chain`, `visualizer`, `hdr`, `aspects`, `remote`, `source`, `picture`, `admin`. Missing ones are added at the end in default order. The editor's *Sections* list sets this with ↑/↓. |
-| `show_chain` · `show_visualizer` · `show_hdr` · `show_aspects` · `show_remote` · `show_inputs` · `show_memory` · `show_picture` · `show_admin` | `true` | Turn parts off. |
+| `show_chain` · `show_visualizer` · `show_hdr` · `show_aspects` · `show_remote` · `show_source` · `show_picture` · `show_admin` | `true` | Turn parts off. |
+| `show_inputs` · `show_memory` | `true` | Hide only the Inputs or Memory row of the Source section. |
 | `accent_color` · `hdr_color` · `game_color` | theme primary · amber · green | Context colors. |
 | `icons:` | | `header`, `aspect`, `remote`, `source`, `picture`, `admin` — any MDI name; `mdi:` is optional. |
 | `styles:` | | Sizes (px) and colors (any CSS color or theme variable) — see below. |
