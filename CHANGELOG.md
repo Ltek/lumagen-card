@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.10.15.7
+
+- **When in standby or off** (Card & sections → Power & standby, YAML `when_off`): **Hide the entire card**, **Collapse to the header** (default, as before) or **Keep expanded** — the last shows every section in standby too. Replaces the "Show the card while off" checkbox; `show_when_off: false` from older configs is read as `hide`.
+- **The card editor always shows the card expanded** — in standby, with *Hide* or *Collapse*, and with *Start collapsed* — so every section can be set up. This no longer depends on Home Assistant passing an edit/preview flag to the card.
+
 ## v2026.10.15.6
 
 - **Editor preview is never collapsed.** With *Start collapsed* on, the card in the card editor and on a Dashboard in edit mode now always shows expanded. It no longer relies on Home Assistant passing a preview flag to the card, which it doesn't always do.

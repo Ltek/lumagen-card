@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.6
+// Version: v2026.10.15.7
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.6';
+const BUILD_NUMBER = 'v2026.10.15.7';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -108,7 +108,7 @@ function resolveEntities(hass, deviceId) {
 const DEFAULTS = {
   device: '',
   title: 'Lumagen',
-  show_when_off: true,
+  when_off: 'collapse',
   power_hold_on: false,
   standby_text: 'below',
   standby_message: '',
@@ -237,10 +237,14 @@ const HIDE_LISTS = {
 };
 // Ancestors that mean "the Dashboard is being edited / this is the editor preview".
 const EDITOR_WRAPPERS = ['hui-card-preview', 'hui-dialog-edit-card', 'hui-card-edit-mode', 'hui-card-options', 'hui-section-edit-mode'];
+// What the card does while the device is in standby / off.
+const WHEN_OFF = [['hide', 'Hide the entire card'], ['collapse', 'Collapse to the header'], ['expanded', 'Keep expanded']];
 const STANDBY_TEXT = [['below', 'Below the title'], ['inline', 'Inline with the title'], ['hidden', 'Hidden']];
 
 function normalizeConfig(raw) {
-  const c = raw && typeof raw === 'object' ? raw : {};
+  let c = raw && typeof raw === 'object' ? raw : {};
+  // Legacy `show_when_off: false` (hide the card in standby) → `when_off: hide`.
+  if (c.when_off === undefined && (c.show_when_off === false || c.show_when_off === 'false')) c = { ...c, when_off: 'hide' };
   const out = {};
   if (c.type !== undefined) out.type = c.type;
   Object.keys(DEFAULTS).forEach((k) => {
@@ -295,7 +299,9 @@ function normalizeConfig(raw) {
     });
     if (list.length) out[k] = list;
   });
+  if (out.when_off !== undefined && !WHEN_OFF.some(([v]) => v === out.when_off)) delete out.when_off;
   Object.keys(c).forEach((k) => {
+    if (k === 'show_when_off') return; // replaced by when_off
     if (!(k in out) && !(k in DEFAULTS) && !(k in HIDE_LISTS) && !['type', 'icons', 'styles', 'section_order'].includes(k)) out[k] = c[k];
   });
   return out;
@@ -814,8 +820,12 @@ class LumagenCard extends HTMLElement {
   // -- visibility -------------------------------------------------------------
   _applyVisibility() {
     if (!this._built) return;
-    const hide = !cfg(this._config, 'show_when_off') && this._powerState === 'off' && !this._editing();
+    const editing = this._editing();
+    const mode = cfg(this._config, 'when_off');
+    const hide = mode === 'hide' && this._powerState === 'off' && !editing;
     this.style.display = hide ? 'none' : '';
+    // In standby the body collapses to the header unless when_off is 'expanded'; the editor always shows it.
+    if (this._k && this._k.body) this._k.body.hidden = !this._found || (this._standbyNow && mode !== 'expanded' && !editing);
     this._applyCollapse();
   }
 
@@ -873,7 +883,8 @@ class LumagenCard extends HTMLElement {
     K.pwr2.hidden = !sbButton;
     K.standby_inline.hidden = !(standby && sbMode === 'inline');
     K.standby.hidden = !(standby && sbMode === 'below');
-    K.body.hidden = !found || (!isOn && !isDown);
+    this._found = found;
+    this._standbyNow = !isOn && !isDown;
 
     // sections on/off (config) + entity availability
     this.querySelectorAll('[data-sec]').forEach((el) => {
@@ -1366,9 +1377,10 @@ class LumagenCardEditor extends HTMLElement {
       <p class="lmge-hint">The header icon is the power button. Standby always needs a press-and-hold.</p>
       <label class="lmge-check"><input type="checkbox" data-key="power_hold_on"${cfg(c, 'power_hold_on') ? ' checked' : ''}>
         Require a hold to turn on too</label>
-      <label class="lmge-check"><input type="checkbox" data-key="show_when_off"${cfg(c, 'show_when_off') ? ' checked' : ''}>
-        Show the card while the Lumagen is off (otherwise hide it)</label>
-      ${cfg(c, 'show_when_off') ? `
+      <div class="lmge-row"><label class="lbl">When in standby or off</label>
+        <select data-key="when_off">${WHEN_OFF.map(([v, n]) => `<option value="${v}"${v === cfg(c, 'when_off') ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <p class="lmge-hint">The card editor always shows the card expanded, so every section can be set up.</p>
+      ${cfg(c, 'when_off') !== 'hide' ? `
       <div class="lmge-row"><label class="lbl">Standby message</label>
         <select data-key="standby_text">${STANDBY_TEXT.map(([v, n]) => `<option value="${v}"${v === sbMode ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
       ${sbMode !== 'hidden' ? `
@@ -1433,7 +1445,7 @@ class LumagenCardEditor extends HTMLElement {
     }));
     this.querySelectorAll('[data-key]').forEach((el) => {
       const key = el.dataset.key;
-      const reveals = ['show_when_off', 'collapsible', 'show_dot', 'standby_text', 'power_hold_on'].includes(key) || key.startsWith('show_');
+      const reveals = ['when_off', 'collapsible', 'show_dot', 'standby_text', 'power_hold_on'].includes(key) || key.startsWith('show_');
       if (el.type === 'checkbox') el.addEventListener('change', () => { this._set(key, el.checked); if (reveals) this._render(); });
       else el.addEventListener('change', () => { this._set(key, el.value.trim()); if (reveals) this._render(); });
     });
@@ -1523,7 +1535,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, fmtVideo, chipLabel, colorMode,
+  WHEN_OFF, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, fmtVideo, chipLabel, colorMode,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);

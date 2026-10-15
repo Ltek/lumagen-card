@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.6** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.15.7** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -34,7 +34,7 @@ By default status sits on top (the order can be changed — see `section_order`)
 ```
 
 - **Header** — the icon is the power button: tap to turn the Lumagen on, **hold** for standby (a stray tap can't stop your movie). The dot is the link: green = the Lumagen answers, red = link down; the summary reads *Offline* in red.
-- **Standby** — the card shrinks to its header instead of disappearing, so you can power on from it. Choose where the "Standby · tap the icon to power on" message goes (below, inline, hidden), or show a power button on the right. Optionally require a hold to turn on too, or hide the card while off (it always shows while you edit the Dashboard).
+- **Standby** — choose what the card does while the Lumagen is in standby / off: **hide the entire card**, **collapse to the header** (the default; you can still power on from it) or **keep expanded**. In the card editor it always starts expanded, so every section can be set up. Choose where the "Standby · tap the icon to power on" message goes (below, inline, hidden), or show a power button on the right. Optionally require a hold to turn on too, or hide the card while off (it always shows while you edit the Dashboard).
 - **Collapse** — optionally tap the header to collapse the card to just the header while the Lumagen is on, and start collapsed.
 - **Signal chain** — source → Lumagen → display; a 24 → 60 or HDR → SDR mismatch is obvious at a glance.
 - **Tags** appear only when active: HDR, GAME, NLS, AUTO AR, 3D, NO SOURCE, TEST PATTERN, LINK DOWN.
@@ -80,7 +80,7 @@ Everything is in the visual editor (Device · Card & sections · Screen & visual
 |---|---|---|
 | `device` | first Lumagen | Device ID, if you have more than one Lumagen. |
 | `title` | `Lumagen` | Header title. |
-| `show_when_off` | `true` | `true`: show the card (header only) while off. `false`: hide the card while off. |
+| `when_off` | `collapse` | While the Lumagen is in standby / off: `hide` (hide the entire card), `collapse` (shrink to the header, so you can power on from it) or `expanded` (keep every section shown). The card editor always shows it expanded. The old `show_when_off: false` still works and means `hide`. |
 | `standby_text` | `below` | Standby message "Standby · tap the icon to power on": `below` the title, `inline` with it, or `hidden`. |
 | `standby_message` | stock text | Your own standby message; empty = "Standby · tap the icon to power on". |
 | `show_dot` | `true` | Show the link dot. |
