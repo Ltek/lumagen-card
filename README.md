@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.9** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.15.10** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -74,7 +74,7 @@ The integration creates some entities **disabled by default**: CMS, Style, Reset
 
 ## Options
 
-Everything is in the visual editor (Device · Card · Sections · Screen & visualizer · Buttons · Icons · Appearance). YAML keys are only written when they differ from the default.
+Everything is in the visual editor (Card (with the device picker) · Sections · Screen & visualizer · Buttons · Icons · Appearance). YAML keys are only written when they differ from the default.
 
 | Key | Default | Description |
 |---|---|---|

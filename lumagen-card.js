@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.9
+// Version: v2026.10.15.10
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.9';
+const BUILD_NUMBER = 'v2026.10.15.10';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -1490,12 +1490,16 @@ class LumagenCardEditor extends HTMLElement {
     }
     return `<div class="lmge-sedit" data-sedit-panel="${id}">
       <div class="lmge-row"><label class="lbl">Name</label><input type="text" data-sname="${id}" value="${esc((c.section_names || {})[id] || '')}" placeholder="${esc(defaultSectionName(id))}"></div>
+      ${this._secOptions(id)}
       <div class="lmge-group">Settings</div>
       ${items.length ? `<div class="lmge-blist">${rows}</div>` : '<p class="lmge-hint">This section is a single block; use its eye to show or hide it.</p>'}
       <div class="lmge-group">Merge</div>
       ${merge}
     </div>`;
   }
+
+  /** Section-specific options shown in its edit panel. */
+  _secOptions() { return ''; }
 
   /** Pencil button for a section row. */
   _secEditBtn(id) {
@@ -1571,7 +1575,10 @@ class LumagenCardEditor extends HTMLElement {
         </select></div>`;
     const sbMode = cfg(c, 'standby_text');
     const cardBody = `
-      <p class="lmge-hint">Header title, the power button, what the card does while the Lumagen is off, and collapsing.</p>
+      <p class="lmge-hint">The device, the header title, the power button, what the card does while the Lumagen is off, and collapsing.</p>
+      <div class="lmge-group">Device</div>
+      ${deviceBody}
+      <div class="lmge-group">Header</div>
       <div class="lmge-row"><label class="lbl">Title</label><input type="text" data-key="title" value="${esc(cfg(c, 'title'))}"></div>
       <div class="lmge-group">Power & standby</div>
       <p class="lmge-hint">The header icon is the power button. Standby always needs a press-and-hold.</p>
@@ -1628,7 +1635,6 @@ class LumagenCardEditor extends HTMLElement {
       ${CONTEXT_COLORS.map(([k, l, d, seed]) => this._colorControl(k, l, d, seed)).join('')}`);
     this.innerHTML = `<style>${EDITOR_CSS}</style>
       <div class="lmge">
-        ${this._panel('device', 'mdi:video-input-hdmi', 'Device', deviceBody)}
         ${this._panel('card', 'mdi:card-text-outline', 'Card', cardBody)}
         ${this._panel('sections', 'mdi:view-agenda-outline', 'Sections', sectionsBody)}
         ${this._panel('screen', 'mdi:projector-screen-outline', 'Screen & visualizer', screenBody)}
