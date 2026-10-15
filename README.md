@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.10** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.15.11** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -33,7 +33,7 @@ By default status sits on top (the order can be changed — see `section_order`)
  ⚙ Admin & link                                   ›
 ```
 
-- **Header** — the icon is the power button: tap to turn the Lumagen on, **hold** for standby (a stray tap can't stop your movie). The dot is the link: green = the Lumagen answers, red = link down; the summary reads *Offline* in red.
+- **Header** — the icon is the power button: tap to turn the Lumagen on, **hold** for standby (a stray tap can't stop your movie). Without a hold — keyboard, screen reader — tap twice within 4 seconds: the first tap asks, the second confirms. The dot is the link: green = the Lumagen answers, red = link down; the summary reads *Offline* in red.
 - **Standby** — choose what the card does while the Lumagen is in standby / off: **hide the entire card**, **collapse to the header** (the default; you can still power on from it) or **keep expanded**. In the card editor it always starts expanded, so every section can be set up. Choose where the "Standby · tap the icon to power on" message goes (below, inline, hidden), or show a power button on the right. Optionally require a hold to turn on too, or hide the card while off (it always shows while you edit the Dashboard).
 - **Collapse** — optionally tap the header to collapse the card to just the header while the Lumagen is on, and start collapsed.
 - **Signal chain** — source → Lumagen → display; a 24 → 60 or HDR → SDR mismatch is obvious at a glance.
@@ -44,7 +44,7 @@ By default status sits on top (the order can be changed — see `section_order`)
 - **Remote** — Menu / Exit / Clear / Help / OK and arrows; **hold an arrow to repeat it 5×**.
 - **Source** — input chips (your Lumagen labels) and memory A–D.
 - **Picture** — CMS and Style chips (your labels).
-- **Admin & link** (**hold to run**) — Hotplug, Restart outputs, Reload config, OSD test, Clear OSD, ALT; link health, and a list of integration entities that are still disabled.
+- **Admin & link** (**hold to run**, or tap twice within 4 seconds) — Hotplug, Restart outputs, Reload config, OSD test, Clear OSD, ALT; link health, and a list of integration entities that are still disabled.
 - **Context tint** — accent normally, HDR color while HDR plays, game color in game mode.
 
 ## Installation
@@ -87,7 +87,7 @@ Everything is in the visual editor (Card (with the device picker) · Sections ·
 | `dot_position` | `title` | `title` (right of the title), `right` (far right), or `icon` (replaces the header icon; it is then the power button). |
 | `hide_aspects` · `hide_inputs` · `hide_memory` | | Buttons to hide — aspect ratios as shown (plus `nls`, `reset`), input numbers (e.g. `[3, 7]`), memory letters (e.g. `[A, C]`). The editor's **Buttons** panel lists your Lumagen's options. |
 | `standby_button` | `false` | In standby, replace the right-hand "Standby" with a power button that turns the Lumagen on. |
-| `power_hold_on` | `false` | Require a press-and-hold to turn **on** too (standby always needs a hold). |
+| `power_hold_on` | `false` | Require a press-and-hold to turn **on** too (standby always needs a hold or a double tap). |
 | `collapsible` | `false` | Tap the header to collapse the card to just the header while the Lumagen is on. |
 | `start_collapsed` | `false` | With `collapsible`, start collapsed. |
 | `display_name` | `Display` | Heading of the third signal-chain box (e.g. your projector). |

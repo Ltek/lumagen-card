@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.10
+// Version: v2026.10.15.11
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.10';
+const BUILD_NUMBER = 'v2026.10.15.11';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -259,6 +259,8 @@ const SECTION_ITEMS = {
 };
 // Sections other sections can be merged into, and sections that can't be merged anywhere.
 const MERGE_TARGETS = ['chain', 'aspects', 'remote', 'source', 'picture', 'admin'];
+// Areas that are always visible (not a collapsed section): merged controls there can be hit by accident.
+const ALWAYS_SHOWN = ['chain'];
 const NOT_MERGEABLE = ['hdr'];
 
 function defaultSectionName(id) { return ((SECTIONS.find((x) => x[0] === id) || [])[1]) || id; }
@@ -605,6 +607,7 @@ const CARD_CSS = `
 .lmg-chip:hover { border-color: var(--lmg-ctx); }
 .lmg-chip.on { background: var(--lmg-ctx); border-color: var(--lmg-ctx); color: #fff; }
 .lmg-chip.act { border-style: dashed; color: var(--lmg-ctx); }
+.lmg-armed { outline: 2px dashed var(--lmg-ctx); outline-offset: 2px; }
 .lmg-held { outline: 2px solid var(--lmg-ctx); outline-offset: 1px; }
 .lmg.is-off .lmg-ctl, .lmg.is-down .lmg-ctl { opacity: .45; pointer-events: none; }
 .lmg.is-down [data-sec="chain"] .lmg-chain, .lmg.is-down [data-sec="visualizer"], .lmg.is-down [data-sec="hdr"] { opacity: .45; }
@@ -840,9 +843,11 @@ class LumagenCard extends HTMLElement {
   _bind() {
     const root = this._root;
     const target = (e) => e.target.closest && e.target.closest('[data-tap],[data-hold],[data-opt]');
+    const cancel = () => { if (this._press) { clearTimeout(this._press.timer); this._press = null; } };
     root.addEventListener('pointerdown', (e) => {
       const el = target(e);
       if (!el || el.dataset.opt !== undefined || !el.dataset.hold) return;
+      el.addEventListener('pointerleave', cancel, { once: true }); // sliding off the button cancels the hold
       const press = { el, held: false };
       press.timer = setTimeout(() => {
         press.held = true;
@@ -852,7 +857,6 @@ class LumagenCard extends HTMLElement {
       }, 500);
       this._press = press;
     });
-    const cancel = () => { if (this._press) { clearTimeout(this._press.timer); this._press = null; } };
     root.addEventListener('pointerleave', cancel);
     root.addEventListener('pointercancel', cancel);
     root.addEventListener('contextmenu', (e) => { if (target(e)) e.preventDefault(); });
@@ -865,8 +869,20 @@ class LumagenCard extends HTMLElement {
       if (press && press.el === el && press.held) return; // hold already ran
       if (el.dataset.opt !== undefined) { this._select(el.dataset.ent, el.dataset.opt); return; }
       if (el.dataset.tap) this._run(el.dataset.tap, el);
-      else if (el.dataset.hold) this._toast('Hold to run');
+      else if (el.dataset.hold) this._confirm(el, el.dataset.hold, 'Hold to run it');
     });
+  }
+
+  /** A hold-only action from a tap, Enter or assistive tech: the first asks, a second within 4 s confirms. */
+  _confirm(el, action, message) {
+    const armed = this._armed;
+    this._armed = null;
+    this.querySelectorAll('.lmg-armed').forEach((b) => b.classList.remove('lmg-armed'));
+    if (armed && armed.el === el && armed.action === action && Date.now() - armed.at < 4000) { this._run(action, el); return; }
+    this._armed = { el, action, at: Date.now() };
+    el.classList.add('lmg-armed');
+    setTimeout(() => { if (this._armed && this._armed.el === el && Date.now() - this._armed.at >= 3990) { this._armed = null; el.classList.remove('lmg-armed'); } }, 4000);
+    this._toast(`${message}, or tap again to confirm`);
   }
 
   _toast(message) {
@@ -889,8 +905,8 @@ class LumagenCard extends HTMLElement {
     switch (action) {
       case 'power': {
         // Standby always needs a hold; turning on needs one only when power_hold_on is set.
-        if (this._isOn()) this._toast('Hold to put the Lumagen in standby');
-        else if (cfg(this._config, 'power_hold_on')) this._toast('Hold to turn the Lumagen on');
+        if (this._isOn()) this._confirm(el, 'power-hold', 'Hold to put the Lumagen in standby');
+        else if (cfg(this._config, 'power_hold_on')) this._confirm(el, 'power-hold', 'Hold to turn the Lumagen on');
         else if (E.power) this._call('switch', 'turn_on', { entity_id: E.power });
         break;
       }
@@ -1043,6 +1059,7 @@ class LumagenCard extends HTMLElement {
     this._standbyNow = !isOn && !isDown;
 
     // sections on/off (config) + entity availability
+    const secShown = {};
     this.querySelectorAll('[data-sec]').forEach((el) => {
       const sec = el.dataset.sec;
       let show = sec === 'source' ? cfg(c, 'show_source') && (cfg(c, 'show_inputs') || cfg(c, 'show_memory')) : cfg(c, 'show_' + sec);
@@ -1051,7 +1068,14 @@ class LumagenCard extends HTMLElement {
       if (sec === 'source') show = show && !!(E.input || E.memory);
       if (sec === 'picture') show = show && !!(E.cms || E.style);
       if (sec === 'hdr') show = show && isHdr && okState(v('hdr_max'));
-      el.hidden = !show && !el.querySelector(':scope > .lmg-merged');
+      el.hidden = !show;
+      secShown[sec] = show;
+    });
+    // A merged section's settings show only when that section would show on its own (its entities
+    // exist, HDR is playing…); a target with nothing of its own still shows for merged settings.
+    this.querySelectorAll('.lmg-merged').forEach((w) => { w.hidden = !secShown[w.dataset.from]; });
+    this.querySelectorAll('[data-sec]').forEach((el) => {
+      if (el.hidden && sectionShown(c, el.dataset.sec) && el.querySelector(':scope > .lmg-merged:not([hidden])')) el.hidden = false;
     });
 
     // signal chain
@@ -1361,6 +1385,7 @@ const EDITOR_CSS = `
         .lmge-brow:first-child { border-top: none; }
         .lmge-brow.off .lmge-sname { color: var(--ltek-c-muted); }
         .lmge-act.on { color: var(--ltek-c-accent); }
+        .lmge-warn { color: var(--warning-color, #ff9800); }
         .lmge-stag { flex: 0 0 auto; font-size: var(--ltek-fs-small); color: var(--ltek-c-muted); white-space: nowrap; }
         .lmge-sedit { margin: calc(-1 * var(--ltek-sp-1)) 0 var(--ltek-sp-1) 28px; padding: var(--ltek-sp-2) var(--ltek-sp-3);
           border: 1px solid var(--ltek-c-accent); border-radius: var(--ltek-r-card); background: var(--ltek-c-surface); }
@@ -1381,7 +1406,7 @@ class LumagenCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
-    this._open = new Set(['device']);
+    this._open = new Set(['card']);
     this._rendered = false;
     this._cmode = {}; // color key -> mode picked in this session (so an empty Custom CSS field stays visible)
   }
@@ -1486,6 +1511,7 @@ class LumagenCardEditor extends HTMLElement {
     else {
       merge = `<div class="lmge-row"><label class="lbl">Show its settings in</label>
         <select data-smerge="${id}"><option value="">— its own section —</option>${targets.map((t) => `<option value="${t}"${t === cur ? ' selected' : ''}>${esc(secLabel(c, t))}</option>`).join('')}</select></div>
+        ${cur && ALWAYS_SHOWN.includes(cur) ? `<p class="lmge-hint lmge-warn">${esc(secLabel(c, cur))} is always visible, not a collapsed section, so these settings can be changed by a stray tap.</p>` : ''}
         <p class="lmge-hint">The section itself disappears from the card; its visible settings appear at the end of the chosen section, under this section's name.${cur && !mergeTarget(c, id) ? ' <b>Not applied now:</b> one of the two sections is hidden.' : ''}</p>`;
     }
     return `<div class="lmge-sedit" data-sedit-panel="${id}">
