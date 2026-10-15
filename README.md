@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.7** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.15.8** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -95,6 +95,9 @@ Everything is in the visual editor (Device · Card & sections · Screen & visual
 | `viz_after_only` | `false` | Show only the screen (result) and its caption. |
 | `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
 | `section_order` | default order | Order of the card's parts: any of `chain`, `visualizer`, `hdr`, `aspects`, `remote`, `source`, `picture`, `admin`. Missing ones are added at the end in default order. The editor's *Sections* list sets this with ↑/↓. |
+| `section_names` | | Your own name per section, e.g. `{ remote: Menu keys }`. Editor: the **pencil** on a section row → Name. |
+| `hidden_items` | | Single settings to hide, as `section.setting`, e.g. `chain.lumagen`, `admin.alt`. Editor: pencil → **Settings**, one eye per setting. Settings that already have their own option (menu shortcuts, flows…) use that option instead. |
+| `section_merge` | | Show a section's settings inside another section, e.g. `picture: source`: the section disappears and its visible settings appear at the end of the target, under its name. Not into a hidden section, and no chains (a section others merge into stays its own), `hdr` cannot merge. Editor: pencil → **Merge**. |
 | `show_chain` · `show_visualizer` · `show_hdr` · `show_aspects` · `show_remote` · `show_source` · `show_picture` · `show_admin` | `true` | Turn parts off. |
 | `show_inputs` · `show_memory` | `true` | Hide only the Inputs or Memory row of the Source section. |
 | `accent_color` · `hdr_color` · `game_color` | theme primary · amber · green | Context colors. |
