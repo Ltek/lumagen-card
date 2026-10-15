@@ -1,5 +1,9 @@
 # Changelog
 
+## v2026.10.15.5
+
+- **Reorder the card's sections.** The editor's *Sections* list (Card & sections panel) now shows every part of the card — signal chain, visualizer, HDR details, Aspect, Remote, Source, Picture, Admin — with ↑/↓ to move it and a Show checkbox (Source has separate Inputs / Memory boxes). Status parts and control sections can be mixed in any order. *Reset to default order* appears once the order has been changed. YAML: `section_order`.
+
 ## v2026.10.12.4
 
 - **Link dot:** show or hide it, and choose where it goes — right of the title (default), far right, or in place of the header icon (it is then the power button).
