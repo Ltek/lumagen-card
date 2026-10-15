@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.11
+// Version: v2026.10.15.12
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.11';
+const BUILD_NUMBER = 'v2026.10.15.12';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -213,6 +213,8 @@ const STYLE_DEFS = [
   ['viz_height', 'viz', 'size', 'Screen height', 72, 40, 180],
   ['caption_size', 'viz', 'size', 'Caption size', 11, 8, 18],
   ['caption_color', 'viz', 'color', 'Caption color', 'Secondary text'],
+  ['viz_border_width', 'viz', 'size', 'Screen border width', 2, 0, 8],
+  ['viz_border_color', 'viz', 'color', 'Screen border color', 'Subtle grey'],
 ];
 const STYLE_GROUPS = [
   ['card', 'Card', 'Background, border and the boxes / remote keys.'],
@@ -223,11 +225,11 @@ const STYLE_GROUPS = [
   ['secondary', 'Details text', 'Second lines, HDR details, link and notes.'],
   ['chips', 'Chips & buttons', 'Input / aspect / CMS / admin buttons. Active chips use the context color.'],
   ['icons', 'Icons', 'Remote key icons and the signal-chain arrows.'],
-  ['viz', 'Visualizer', 'Screen size and the caption under each screen.'],
+  ['viz', 'Visualizer', 'Screen size, the border around each screen, and the caption under it.'],
 ];
 const STYLE_INDEX = Object.fromEntries(STYLE_DEFS.map((d) => [d[0], d]));
 // Backgrounds and borders also offer "Transparent".
-const TRANSPARENT_KEYS = new Set(['card_background', 'card_border_color', 'box_background', 'divider_color', 'chip_background', 'chip_border_color']);
+const TRANSPARENT_KEYS = new Set(['card_background', 'card_border_color', 'box_background', 'divider_color', 'chip_background', 'chip_border_color', 'viz_border_color']);
 const DOT_POSITIONS = [['title', 'Right of the title'], ['right', 'Far right'], ['icon', 'Replace the header icon']];
 // Per-section hidden buttons: config key → how an option maps to its stored id.
 const HIDE_LISTS = {
@@ -438,21 +440,46 @@ function fitRect(x, y, w, h, ar) {
  * Geometry of what the Lumagen does, in "source units" (raster height = 100).
  *   raster   — the incoming frame (e.g. 1.78)
  *   content  — where the real picture is inside it (detected content aspect)
- *   selected — the region the Lumagen is told the content occupies (source aspect)
- *   screen / image — your screen, and where the output image lands on it
- * The output shows `selected` stretched to fill `image` (non-uniform when they differ),
- * which is exactly how a mismatched aspect setting crops or adds bars on screen.
+ *   selected — the region the Lumagen treats as the picture (its source-aspect setting).
+ *              Wider than the content → the picture's top/bottom are cropped; narrower →
+ *              the film's own black bars are kept.
+ *   screen   — your screen; `area` is where the output aspect lands on it (usually all of it)
+ *   picture  — where the selected region is drawn: scaled UNIFORMLY to fit the area
+ *              (letterbox / pillarbox), never stretched. With NLS a narrower picture is
+ *              stretched sideways to fill the area's width (drawn linearly; at this size the
+ *              non-linear curve isn't visible). The Lumagen has no vertical stretch.
+ * Zoom is not modelled: it can't be read over RS-232.
  */
-function vizGeometry({ raster, content, selected, output, screen }) {
+function vizGeometry({ raster, content, selected, output, screen, nls = false }) {
   const W = 100 * raster;
   const scrW = 100 * screen;
+  const area = fitRect(0, 0, scrW, 100, output);
+  const fit = fitRect(area.x, area.y, area.w, area.h, selected);
+  const picture = nls && selected < output - 0.005 ? { x: area.x, y: fit.y, w: area.w, h: fit.h } : fit;
   return {
     source: { w: W, h: 100 },
     content: fitRect(0, 0, W, 100, content),
     selected: fitRect(0, 0, W, 100, selected),
     screen: { w: scrW, h: 100 },
-    image: fitRect(0, 0, scrW, 100, output),
+    area,
+    picture,
+    image: picture, // kept for older callers
   };
+}
+
+/** Words for what the viewer sees on the screen. */
+function vizResult({ content, selected, output, screen, nls }, g) {
+  const out = [];
+  if (selected > content + 0.01) out.push('top/bottom cropped');
+  else if (selected < content - 0.01) out.push('film bars kept');
+  const p = g.picture;
+  const bars = [];
+  if (p.h < g.screen.h - 0.5) bars.push('letterboxed');
+  if (p.w < g.screen.w - 0.5) bars.push('pillarboxed');
+  if (nls && selected < output - 0.005) out.push('NLS stretch');
+  if (bars.length) out.push(bars.length === 2 ? 'windowboxed' : bars[0]);
+  if (!out.length) out.push(Math.abs(screen - output) < 0.005 ? 'fills the screen' : 'fills the output area');
+  return out.join(' · ');
 }
 
 function fmtVideo(res, mode, rate) {
@@ -582,7 +609,7 @@ const CARD_CSS = `
   color: var(--lmg-caption-color, var(--secondary-text-color)); }
 .lmg-cap b { color: var(--lmg-text-color, var(--primary-text-color)); font-weight: 600; }
 .lmg-frame { fill: #000; }
-.lmg-edge { fill: none; stroke: rgba(127,127,127,0.6); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.lmg-edge { fill: none; stroke: var(--lmg-viz-border-color, rgba(127,127,127,0.6)); stroke-width: var(--lmg-viz-border-width, 2px); vector-effect: non-scaling-stroke; }
 .lmg-sel { fill: none; stroke: var(--lmg-ctx); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 .lmg-wall { fill: rgba(127,127,127,0.18); }
 .lmg-hdrp { margin-top: 8px; font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
@@ -757,6 +784,7 @@ class LumagenCard extends HTMLElement {
             <div class="lmg-scr" data-item="viz-after">
               <svg data-v="scr" aria-label="Screen">
                 <rect class="lmg-wall" data-v="scr-wall"></rect>
+                <rect class="lmg-frame" data-v="scr-area"></rect>
                 <svg data-v="out" preserveAspectRatio="none">
                   <rect class="lmg-frame" data-v="out-frame"></rect>
                   <image data-v="out-img" preserveAspectRatio="xMidYMid slice"></image>
@@ -1190,7 +1218,8 @@ class LumagenCard extends HTMLElement {
     const content = parseAspect(v('det_content')) || selected; // the real picture
     const screen = Number(cfg(this._config, 'display_aspect')) || 1.78;
     const output = parseAspect(v('out_aspect')) || screen;
-    const g = vizGeometry({ raster, content, selected, output, screen });
+    const nls = v('nls') === 'True';
+    const g = vizGeometry({ raster, content, selected, output, screen, nls });
     const V = this._v;
     const attrs = (el, o) => Object.entries(o).forEach(([k, val]) => {
       const s = typeof val === 'number' ? val.toFixed(2) : val;
@@ -1205,17 +1234,19 @@ class LumagenCard extends HTMLElement {
     attrs(V['src-img'], rect(g.content));
     attrs(V['src-sel'], rect(g.selected));
     V['src-sel'].style.display = Math.abs(selected - content) > 0.01 ? '' : 'none';
-    // after: the screen, with the selected region stretched into the output image area
+    // after: the screen; the Lumagen's output area is black, and the selected region is
+    // scaled into it (uniform fit; NLS fills the width). The nested svg's viewBox clips
+    // anything outside the selected region — that is the top/bottom crop.
     attrs(V.scr, { viewBox: vb(0, 0, g.screen.w, g.screen.h) });
     attrs(V['scr-wall'], { x: 0, y: 0, width: g.screen.w, height: g.screen.h });
+    attrs(V['scr-area'], rect(g.area));
     attrs(V['scr-edge'], { x: 0, y: 0, width: g.screen.w, height: g.screen.h });
-    attrs(V.out, { ...rect(g.image), viewBox: vb(g.selected.x, g.selected.y, g.selected.w, g.selected.h) });
+    attrs(V.out, { ...rect(g.picture), viewBox: vb(g.selected.x, g.selected.y, g.selected.w, g.selected.h) });
     attrs(V['out-frame'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
     attrs(V['out-img'], rect(g.content));
-    const nls = v('nls') === 'True';
     const before = `Content <b>${f2(content)}</b>${Math.abs(content - raster) > 0.01 ? ` in ${f2(raster)} frame` : ''}`
       + (Math.abs(selected - content) > 0.01 ? `<br>Lumagen set to ${f2(selected)}` : '');
-    const after = `Content <b>${f2(selected)}</b> · Output <b>${f2(output)}</b><br>on ${f2(screen)} screen${nls ? ' · NLS' : ''}`;
+    const after = `Content <b>${f2(selected)}</b> · Output <b>${f2(output)}</b><br>on ${f2(screen)} screen · ${vizResult({ content, selected, output, screen, nls }, g)}`;
     if (this._k.cap_before.innerHTML !== before) this._k.cap_before.innerHTML = before;
     if (this._k.cap_after.innerHTML !== after) this._k.cap_after.innerHTML = after;
   }
@@ -1797,7 +1828,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, fmtVideo, chipLabel, colorMode,
+  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, fmtVideo, chipLabel, colorMode,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);

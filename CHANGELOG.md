@@ -1,5 +1,15 @@
 # Changelog
 
+## v2026.10.15.12
+
+- **The visualizer now draws what the Lumagen really outputs.** The picture is scaled uniformly into the output area — letterboxed or pillarboxed when the shapes differ — instead of being stretched to fill it. (Before, a 2.40 film on a 16:9 screen was drawn 35% too tall, and a 16:9 show on a scope screen 35% too wide.)
+- **Crop and bars from the source-aspect setting:** set wider than the film, the top and bottom of the picture are cut off; set narrower, the film's own black bars stay in the picture.
+- **NLS** fills the width (no vertical stretch — the Lumagen has none); drawn as a plain stretch, since the non-linear curve isn't visible at this size.
+- The Lumagen's output area is drawn black; any part of the screen outside it stays unlit.
+- The caption under the screen now says what you see: *fills the screen*, *letterboxed*, *pillarboxed*, *top/bottom cropped*, *film bars kept*, *NLS stretch*.
+- **Screen border** width and color are adjustable (Appearance → Visualizer), including transparent.
+- Not shown: Lumagen zoom — its current value can't be read over RS-232.
+
 ## v2026.10.15.11
 
 - **Merged sections follow their own checks.** A merged section's settings now show only when that section would show on its own — e.g. Picture merged elsewhere without its entities no longer leaves an empty heading, and merged controls never appear for a missing entity.

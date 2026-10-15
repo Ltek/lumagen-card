@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.11** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.15.12** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -38,7 +38,7 @@ By default status sits on top (the order can be changed — see `section_order`)
 - **Collapse** — optionally tap the header to collapse the card to just the header while the Lumagen is on, and start collapsed.
 - **Signal chain** — source → Lumagen → display; a 24 → 60 or HDR → SDR mismatch is obvious at a glance.
 - **Tags** appear only when active: HDR, GAME, NLS, AUTO AR, 3D, NO SOURCE, TEST PATTERN, LINK DOWN.
-- **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **stretched into its output area exactly as the Lumagen does** — so a wrong setting shows the real crop or the bars you'd see. A caption is centered under each screen. Uses a built-in landscape, or your own picture. Option: show only the screen.
+- **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **scaled into its output area the way the Lumagen does** — letterboxed or pillarboxed when the shapes differ, never distorted; NLS fills the width. A wrong setting shows the real crop or bars. A caption under each screen says what you see (*letterboxed*, *pillarboxed*, *top/bottom cropped*, *film bars kept*…). Zoom isn't shown (it can't be read over RS-232). Uses a built-in landscape, or your own picture. Option: show only the screen.
 - **HDR panel** (HDR sources) — mastering peak and minimum, and a MaxCLL bar.
 - **Aspect** — aspect chips (from the integration's *Aspect ratio menu* option), NLS and Reset auto aspect.
 - **Remote** — Menu / Exit / Clear / Help / OK and arrows; **hold an arrow to repeat it 5×**.
@@ -104,7 +104,7 @@ Everything is in the visual editor (Card (with the device picker) · Sections ·
 | `icons:` | | `header`, `aspect`, `remote`, `source`, `picture`, `admin` — any MDI name; `mdi:` is optional. |
 | `styles:` | | Sizes (px) and colors (any CSS color or theme variable) — see below. |
 
-**`styles:` keys** — sizes: `card_radius` `card_padding` `standby_indent` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size`; colors: `card_background` `card_border_color` `box_background` `divider_color` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color`.
+**`styles:` keys** — sizes: `card_radius` `card_padding` `standby_indent` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size` `viz_border_width`; colors: `card_background` `card_border_color` `box_background` `divider_color` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color` `viz_border_color`.
 
 Backgrounds and borders (`card_background`, `card_border_color`, `box_background`, `divider_color`, `chip_background`, `chip_border_color`) also accept `transparent` — the editor offers it as a choice.
 
