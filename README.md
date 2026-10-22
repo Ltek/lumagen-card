@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.15.12** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.22.13** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -38,7 +38,7 @@ By default status sits on top (the order can be changed — see `section_order`)
 - **Collapse** — optionally tap the header to collapse the card to just the header while the Lumagen is on, and start collapsed.
 - **Signal chain** — source → Lumagen → display; a 24 → 60 or HDR → SDR mismatch is obvious at a glance.
 - **Tags** appear only when active: HDR, GAME, NLS, AUTO AR, 3D, NO SOURCE, TEST PATTERN, LINK DOWN.
-- **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **scaled into its output area the way the Lumagen does** — letterboxed or pillarboxed when the shapes differ, never distorted; NLS fills the width. A wrong setting shows the real crop or bars. A caption under each screen says what you see (*letterboxed*, *pillarboxed*, *top/bottom cropped*, *film bars kept*…). Zoom isn't shown (it can't be read over RS-232). Uses a built-in landscape, or your own picture. Option: show only the screen.
+- **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **scaled into its output area the way the Lumagen does** — letterboxed or pillarboxed when the shapes differ, never distorted. **NLS** (a 16:9 or 4:3 picture on a wider screen) fills the output area the way the Lumagen does: mostly a horizontal stretch plus a slight vertical stretch that crops the top and bottom — the left screen outlines the part that is kept and says how much is cropped (*NLS crops 2.4% top & bottom*). Set `nls_vertical` to the vertical stretch in your Lumagen's NLS settings. A wrong setting shows the real crop or bars. A caption under each screen says what you see (*letterboxed*, *pillarboxed*, *top/bottom cropped*, *film bars kept*…). Zoom isn't shown (it can't be read over RS-232). Uses a built-in landscape, or your own picture. Option: show only the screen.
 - **HDR panel** (HDR sources) — mastering peak and minimum, and a MaxCLL bar.
 - **Aspect** — aspect chips (from the integration's *Aspect ratio menu* option), NLS and Reset auto aspect.
 - **Remote** — Menu / Exit / Clear / Help / OK and arrows; **hold an arrow to repeat it 5×**.
@@ -92,6 +92,7 @@ Everything is in the visual editor (Card (with the device picker) · Sections ·
 | `start_collapsed` | `false` | With `collapsible`, start collapsed. |
 | `display_name` | `Display` | Heading of the third signal-chain box (e.g. your projector). |
 | `display_aspect` | `1.78` | Your screen shape (e.g. `2.40` for a scope screen). |
+| `nls_vertical` | `5` | NLS vertical stretch in percent (0–25), as set in the Lumagen's NLS menu. With NLS on, the visualizer stretches the picture this much vertically (cropping the top and bottom) and the rest horizontally; never more vertically than the widening needs. `0` = a purely horizontal stretch. Editor: Screen → Visualizer. |
 | `viz_after_only` | `false` | Show only the screen (result) and its caption. |
 | `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
 | `section_order` | default order | Order of the card's parts: any of `chain`, `visualizer`, `hdr`, `aspects`, `remote`, `source`, `picture`, `admin`. Missing ones are added at the end in default order. The editor's *Sections* list sets this with ↑/↓. |

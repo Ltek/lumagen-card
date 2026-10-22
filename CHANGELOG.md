@@ -1,5 +1,11 @@
 # Changelog
 
+## v2026.10.22.13
+
+- **NLS crops the top and bottom, like the Lumagen.** With NLS on (e.g. 16:9 on a 2.00 screen), the visualizer now applies a slight vertical stretch — the picture loses a little at the top and bottom — and stretches the rest horizontally, instead of a purely horizontal stretch. The source screen outlines the part that is kept and says how much is cropped (*NLS crops 2.4% top & bottom*); the screen caption reads *top/bottom cropped · NLS stretch*. New `nls_vertical` (default 5 %, Screen → Visualizer): set it to your Lumagen's NLS vertical stretch; `0` is the old horizontal-only stretch. The vertical stretch never goes beyond what the widening needs (e.g. 16:9 → 1.85). Pictures without NLS are unchanged: always scaled uniformly.
+- **Holds on a phone or tablet no longer also tap.** Lifting your finger after a hold made the browser send a tap too: holding an arrow sent the 5× repeat plus one more press, and an Admin button or power hold was followed by a "tap again to confirm" prompt. The click that ends a hold is now ignored.
+- Long-pressing a button no longer selects its text or opens the iOS callout.
+
 ## v2026.10.15.12
 
 - **The visualizer now draws what the Lumagen really outputs.** The picture is scaled uniformly into the output area — letterboxed or pillarboxed when the shapes differ — instead of being stretched to fill it. (Before, a 2.40 film on a 16:9 screen was drawn 35% too tall, and a 16:9 show on a scope screen 35% too wide.)

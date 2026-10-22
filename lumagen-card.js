@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.15.12
+// Version: v2026.10.22.13
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.15.12';
+const BUILD_NUMBER = 'v2026.10.22.13';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -119,6 +119,7 @@ const DEFAULTS = {
   start_collapsed: false,
   display_name: 'Display',
   display_aspect: 1.78,
+  nls_vertical: 5, // NLS vertical stretch in percent (the Lumagen's NLS menu); crops top / bottom
   viz_after_only: false,
   scene_image: '',
   show_chain: true,
@@ -444,33 +445,50 @@ function fitRect(x, y, w, h, ar) {
  *              Wider than the content → the picture's top/bottom are cropped; narrower →
  *              the film's own black bars are kept.
  *   screen   — your screen; `area` is where the output aspect lands on it (usually all of it)
- *   picture  — where the selected region is drawn: scaled UNIFORMLY to fit the area
- *              (letterbox / pillarbox), never stretched. With NLS a narrower picture is
- *              stretched sideways to fill the area's width (drawn linearly; at this size the
- *              non-linear curve isn't visible). The Lumagen has no vertical stretch.
+ *   visible  — the part of the selected region that reaches the screen
+ *   picture  — where `visible` is drawn: scaled UNIFORMLY to fit the area (letterbox /
+ *              pillarbox), never stretched — except with NLS.
+ * NLS (a selected region narrower than the output, e.g. 16:9 on a 2.00 screen): the Lumagen
+ * fills the output area. Part of the widening is a small uniform VERTICAL stretch, which
+ * crops the top and bottom; the rest is the horizontal non-linear stretch (drawn linearly;
+ * at this size the curve isn't visible). `nlsVertical` is that vertical stretch in percent
+ * (the Lumagen's NLS vertical-stretch setting), capped so it never crops more than the
+ * widening needs. `vstretch` is the factor used (1 = none).
  * Zoom is not modelled: it can't be read over RS-232.
  */
-function vizGeometry({ raster, content, selected, output, screen, nls = false }) {
+function vizGeometry({ raster, content, selected, output, screen, nls = false, nlsVertical = 0 }) {
   const W = 100 * raster;
   const scrW = 100 * screen;
   const area = fitRect(0, 0, scrW, 100, output);
-  const fit = fitRect(area.x, area.y, area.w, area.h, selected);
-  const picture = nls && selected < output - 0.005 ? { x: area.x, y: fit.y, w: area.w, h: fit.h } : fit;
+  const sel = fitRect(0, 0, W, 100, selected);
+  const stretching = nls && selected < output - 0.005;
+  const vstretch = stretching ? Math.min(1 + Math.max(0, nlsVertical) / 100, output / selected) : 1;
+  // the vertical stretch pushes the top and bottom of the selected region off the screen
+  const vh = sel.h / vstretch;
+  const visible = { x: sel.x, y: sel.y + (sel.h - vh) / 2, w: sel.w, h: vh };
+  const picture = stretching ? { ...area } : fitRect(area.x, area.y, area.w, area.h, selected);
   return {
     source: { w: W, h: 100 },
     content: fitRect(0, 0, W, 100, content),
-    selected: fitRect(0, 0, W, 100, selected),
+    selected: sel,
+    visible,
     screen: { w: scrW, h: 100 },
     area,
     picture,
+    vstretch,
+    hstretch: stretching ? output / (selected * vstretch) : 1,
     image: picture, // kept for older callers
   };
 }
 
+/** Share of the picture height NLS crops off the top and bottom together, in percent (0 = none). */
+function nlsCropPct(g) { return g.vstretch > 1 ? (1 - 1 / g.vstretch) * 100 : 0; }
+
 /** Words for what the viewer sees on the screen. */
 function vizResult({ content, selected, output, screen, nls }, g) {
   const out = [];
-  if (selected > content + 0.01) out.push('top/bottom cropped');
+  const nlsCrop = nlsCropPct(g);
+  if (selected > content + 0.01 || nlsCrop > 0.05) out.push('top/bottom cropped');
   else if (selected < content - 0.01) out.push('film bars kept');
   const p = g.picture;
   const bars = [];
@@ -514,11 +532,15 @@ function morphChildren(from, to) {
   a.slice(b.length).forEach((n) => n.remove());
 }
 
+// After a hold runs, the click that ends it is ignored for this long (a later tap is a new tap).
+const HOLD_CLICK_MS = 1500;
+
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 const f2 = (n) => Number(n).toFixed(2);
+const f1 = (n) => Number(n).toFixed(1);
 
 // Built-in picture for the visualizer: a license-free landscape drawn as SVG, with
 // detail at the edges (trees) and top/bottom (sun, lake) so cropping is obvious.
@@ -552,7 +574,8 @@ const CARD_CSS = `
 .lmg.is-hdr { --lmg-ctx: var(--lmg-hdr, #ffb300); }
 .lmg.is-game { --lmg-ctx: var(--lmg-game, #4caf50); }
 .lmg [hidden] { display: none !important; }
-.lmg button { font: inherit; }
+/* Buttons with a hold: no text selection or callout on a long-press (iOS / Android). */
+.lmg button { font: inherit; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .lmg-head { display: flex; align-items: center; gap: 10px; min-height: 36px; }
 .lmg-power { flex: 0 0 auto; width: calc(var(--lmg-header-icon-size, 22px) + 14px); height: calc(var(--lmg-header-icon-size, 22px) + 14px);
   border-radius: 50%; border: none; cursor: pointer; background: transparent; color: var(--disabled-text-color, #777);
@@ -871,7 +894,14 @@ class LumagenCard extends HTMLElement {
   _bind() {
     const root = this._root;
     const target = (e) => e.target.closest && e.target.closest('[data-tap],[data-hold],[data-opt]');
-    const cancel = () => { if (this._press) { clearTimeout(this._press.timer); this._press = null; } };
+    // Leaving the button (or a cancelled pointer) stops a hold that hasn't fired yet. A hold that already
+    // ran is kept, so the click that follows it is swallowed: on touch screens the browser sends
+    // pointerleave right after pointerup, before that click.
+    const cancel = () => {
+      if (!this._press) return;
+      clearTimeout(this._press.timer);
+      if (!this._press.held) this._press = null;
+    };
     root.addEventListener('pointerdown', (e) => {
       const el = target(e);
       if (!el || el.dataset.opt !== undefined || !el.dataset.hold) return;
@@ -879,6 +909,7 @@ class LumagenCard extends HTMLElement {
       const press = { el, held: false };
       press.timer = setTimeout(() => {
         press.held = true;
+        press.heldAt = Date.now();
         el.classList.add('lmg-held');
         setTimeout(() => el.classList.remove('lmg-held'), 300);
         this._run(el.dataset.hold, el);
@@ -894,7 +925,7 @@ class LumagenCard extends HTMLElement {
       const press = this._press;
       this._press = null;
       if (press) clearTimeout(press.timer);
-      if (press && press.el === el && press.held) return; // hold already ran
+      if (press && press.el === el && press.held && Date.now() - press.heldAt < HOLD_CLICK_MS) return; // hold already ran
       if (el.dataset.opt !== undefined) { this._select(el.dataset.ent, el.dataset.opt); return; }
       if (el.dataset.tap) this._run(el.dataset.tap, el);
       else if (el.dataset.hold) this._confirm(el, el.dataset.hold, 'Hold to run it');
@@ -1219,7 +1250,9 @@ class LumagenCard extends HTMLElement {
     const screen = Number(cfg(this._config, 'display_aspect')) || 1.78;
     const output = parseAspect(v('out_aspect')) || screen;
     const nls = v('nls') === 'True';
-    const g = vizGeometry({ raster, content, selected, output, screen, nls });
+    const nlsVertical = Math.min(25, Math.max(0, Number(cfg(this._config, 'nls_vertical')) || 0));
+    const g = vizGeometry({ raster, content, selected, output, screen, nls, nlsVertical });
+    const crop = nlsCropPct(g);
     const V = this._v;
     const attrs = (el, o) => Object.entries(o).forEach(([k, val]) => {
       const s = typeof val === 'number' ? val.toFixed(2) : val;
@@ -1232,8 +1265,9 @@ class LumagenCard extends HTMLElement {
     attrs(V['src-frame'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
     attrs(V['src-edge'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
     attrs(V['src-img'], rect(g.content));
-    attrs(V['src-sel'], rect(g.selected));
-    V['src-sel'].style.display = Math.abs(selected - content) > 0.01 ? '' : 'none';
+    // the outline is what reaches the screen: the Lumagen's region, less the NLS top / bottom crop
+    attrs(V['src-sel'], rect(g.visible));
+    V['src-sel'].style.display = Math.abs(selected - content) > 0.01 || crop > 0.05 ? '' : 'none';
     // after: the screen; the Lumagen's output area is black, and the selected region is
     // scaled into it (uniform fit; NLS fills the width). The nested svg's viewBox clips
     // anything outside the selected region — that is the top/bottom crop.
@@ -1241,11 +1275,12 @@ class LumagenCard extends HTMLElement {
     attrs(V['scr-wall'], { x: 0, y: 0, width: g.screen.w, height: g.screen.h });
     attrs(V['scr-area'], rect(g.area));
     attrs(V['scr-edge'], { x: 0, y: 0, width: g.screen.w, height: g.screen.h });
-    attrs(V.out, { ...rect(g.picture), viewBox: vb(g.selected.x, g.selected.y, g.selected.w, g.selected.h) });
+    attrs(V.out, { ...rect(g.picture), viewBox: vb(g.visible.x, g.visible.y, g.visible.w, g.visible.h) });
     attrs(V['out-frame'], { x: 0, y: 0, width: g.source.w, height: g.source.h });
     attrs(V['out-img'], rect(g.content));
     const before = `Content <b>${f2(content)}</b>${Math.abs(content - raster) > 0.01 ? ` in ${f2(raster)} frame` : ''}`
-      + (Math.abs(selected - content) > 0.01 ? `<br>Lumagen set to ${f2(selected)}` : '');
+      + (Math.abs(selected - content) > 0.01 ? `<br>Lumagen set to ${f2(selected)}` : '')
+      + (crop > 0.05 ? `<br>NLS crops ${f1(crop / 2)}% top &amp; bottom` : '');
     const after = `Content <b>${f2(selected)}</b> · Output <b>${f2(output)}</b><br>on ${f2(screen)} screen · ${vizResult({ content, selected, output, screen, nls }, g)}`;
     if (this._k.cap_before.innerHTML !== before) this._k.cap_before.innerHTML = before;
     if (this._k.cap_after.innerHTML !== after) this._k.cap_after.innerHTML = after;
@@ -1673,6 +1708,8 @@ class LumagenCardEditor extends HTMLElement {
       ${this._slider('display_aspect', 'Aspect', aspect, 1.33, 2.76, 0.01, '', (n) => Number(n).toFixed(2))}
       <div class="lmge-presets">${ASPECT_PRESETS.map((p) => `<button class="lmge-preset${Math.abs(p - aspect) < 0.005 ? ' on' : ''}" data-preset="${p}">${p.toFixed(2)}</button>`).join('')}</div>
       <div class="lmge-group">Visualizer</div>
+      ${this._slider('nls_vertical', 'NLS vertical stretch', Math.min(25, Math.max(0, Number(cfg(c, 'nls_vertical')))), 0, 25, 1, '', (n) => `${n}%`)}
+      <p class="lmge-hint">With NLS on (a 16:9 picture on a wider screen), part of the widening is a small vertical stretch that crops the top and bottom. Set this to the vertical stretch in your Lumagen's NLS settings so the visualizer crops the same.</p>
       <label class="lmge-check"><input type="checkbox" data-key="viz_after_only"${cfg(c, 'viz_after_only') ? ' checked' : ''}>
         Only show the screen (result) and its description</label>
       <div class="lmge-row"><label class="lbl">Picture</label><input type="text" data-key="scene_image" value="${esc(cfg(c, 'scene_image'))}" placeholder="Built-in landscape — or a URL, e.g. /local/beach.jpg"></div>`;
@@ -1717,7 +1754,7 @@ class LumagenCardEditor extends HTMLElement {
     this.querySelectorAll('[data-skey]').forEach((el) => {
       const key = el.dataset.skey;
       const scope = el.dataset.scope;
-      const fmt = scope ? (n) => `${n}px` : (n) => Number(n).toFixed(2);
+      const fmt = scope ? (n) => `${n}px` : key === 'nls_vertical' ? (n) => `${n}%` : (n) => Number(n).toFixed(2);
       el.addEventListener('input', () => {
         const out = this.querySelector(`[data-val="${scope}:${key}"]`);
         if (out) out.textContent = fmt(el.value);
@@ -1828,7 +1865,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, fmtVideo, chipLabel, colorMode,
+  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);
