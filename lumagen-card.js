@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.23.16
+// Version: v2026.10.23.17
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.23.16';
+const BUILD_NUMBER = 'v2026.10.23.17';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -132,6 +132,7 @@ const DEFAULTS = {
   show_memory: true,
   show_picture: true,
   show_admin: true,
+  stack_when_narrow: 'auto', // status boxes on a narrow card: auto (stack under 260 px) | always | never
   accent_color: '',
   hdr_color: '',
   game_color: '',
@@ -251,7 +252,7 @@ const STATUS_TAGS = [['link', 'LINK DOWN'], ['hdr', 'HDR'], ['game', 'GAME'], ['
 // Per-section settings the user can hide: [id, label, selector, existing show key?]. A setting with
 // a show key is the card's own option (its eye toggles that key); the rest use hidden_items.
 const SECTION_ITEMS = {
-  chain: [['source', 'Source box', '[data-item="box-src"]'], ['proc', 'Processing on the arrow (scaled, tone map, aspect)', '[data-item="proc"]'],
+  chain: [['source', 'Source box', '[data-item="box-src"]'], ['proc', 'Processing on the arrow (scaled, tone map)', '[data-item="proc"]'],
     ['display', 'Display box', '[data-item="box-disp"]'], ['lumagen', 'Lumagen settings chips (memory, CMS, style)', '[data-item="box-lmg"]'],
     ['tags', 'Status tags (all)', '[data-k="tags"]'],
     ...STATUS_TAGS.map(([id, label]) => [`tag_${id}`, `Tag: ${label}`, `[data-tag="${id}"]`])],
@@ -318,6 +319,7 @@ function normalizeSectionEdits(c, out) {
 
 // What the card does while the device is in standby / off.
 const WHEN_OFF = [['hide', 'Hide the entire card'], ['collapse', 'Collapse to the header'], ['expanded', 'Keep expanded']];
+const STACK_MODES = [['auto', 'Only on a very narrow card'], ['always', 'Always'], ['never', 'Never (always side by side)']];
 const STANDBY_TEXT = [['below', 'Below the title'], ['inline', 'Inline with the title'], ['hidden', 'Hidden']];
 
 function normalizeConfig(raw) {
@@ -379,6 +381,7 @@ function normalizeConfig(raw) {
     if (list.length) out[k] = list;
   });
   if (out.when_off !== undefined && !WHEN_OFF.some(([v]) => v === out.when_off)) delete out.when_off;
+  if (out.stack_when_narrow !== undefined && !STACK_MODES.some(([v]) => v === out.stack_when_narrow)) delete out.stack_when_narrow;
   normalizeSectionEdits(c, out);
   Object.keys(c).forEach((k) => {
     if (k === 'show_when_off') return; // replaced by when_off
@@ -417,7 +420,7 @@ function rootStyleVars(config) {
 /** Classes on the card root that depend on config (constant stylesheet, no interpolation). */
 function rootClasses(config) {
   const st = config.styles || {};
-  const cls = ['lmg'];
+  const cls = ['lmg', `stack-${cfg(config, 'stack_when_narrow')}`];
   if (st.card_border_color) cls.push('has-border');
   if (st.card_background === 'transparent') cls.push('is-flat');
   return cls.join(' ');
@@ -650,11 +653,16 @@ const CARD_CSS = `
 .lmg-ar { color: var(--lmg-ctx); font-weight: 600; }
 .lmg-status { container-type: inline-size; }
 /* Narrow card: stack Source over Display, the arrow points down with the processing beside it. */
-@container (max-width: 360px) {
-  .lmg-status .lmg-chain { flex-direction: column; }
-  .lmg-status .lmg-link { max-width: none; flex-direction: row-reverse; gap: 6px; }
-  .lmg-status .lmg-arrow { transform: rotate(90deg); }
+/* Stacking (stack_when_narrow): auto stacks the boxes only on a really narrow card (status area under
+   260 px — a phone in portrait stays side by side); always stacks them; never keeps them side by side. */
+@container (max-width: 260px) {
+  .lmg.stack-auto .lmg-status .lmg-chain { flex-direction: column; }
+  .lmg.stack-auto .lmg-status .lmg-link { max-width: none; flex-direction: row-reverse; gap: 6px; }
+  .lmg.stack-auto .lmg-status .lmg-arrow { transform: rotate(90deg); }
 }
+.lmg.stack-always .lmg-status .lmg-chain { flex-direction: column; }
+.lmg.stack-always .lmg-status .lmg-link { max-width: none; flex-direction: row-reverse; gap: 6px; }
+.lmg.stack-always .lmg-status .lmg-arrow { transform: rotate(90deg); }
 .lmg-arrow { align-self: center; color: var(--lmg-icon-color, var(--lmg-ctx)); --mdc-icon-size: 18px; }
 .lmg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .lmg-tagset { display: contents; }
@@ -1645,7 +1653,15 @@ class LumagenCardEditor extends HTMLElement {
   }
 
   /** Section-specific options shown in its edit panel. */
-  _secOptions() { return ''; }
+  _secOptions(id) {
+    const c = this._config;
+    if (id === 'chain') {
+      return `      <div class="lmge-group">Layout</div>
+      <div class="lmge-row"><label class="lbl">Stack the boxes</label><select data-key="stack_when_narrow">${STACK_MODES.map(([v, n]) => `<option value="${v}"${v === cfg(c, 'stack_when_narrow') ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <p class="lmge-hint">Put the boxes one above the other. <b>Only on a very narrow card</b> keeps them side by side on a phone and stacks them when the card is narrower still (e.g. a small grid column).</p>`;
+    }
+    return '';
+  }
 
   /** Pencil button for a section row. */
   _secEditBtn(id) {
@@ -1919,7 +1935,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
+  WHEN_OFF, STACK_MODES, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);

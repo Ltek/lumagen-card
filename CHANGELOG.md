@@ -1,5 +1,11 @@
 # Changelog
 
+## v2026.10.23.17
+
+- **The status boxes stay side by side on a phone.** They stacked whenever the status area was under 360 px, which is every phone in portrait. Now they stack only under 260 px (e.g. a small grid column).
+- **New `stack_when_narrow`** (Sections → pencil on the signal chain → Options): *Only on a very narrow card* (default), *Always* or *Never*.
+- The editor label for the arrow's settings eye no longer mentions the aspect (it moved into the boxes in v2026.10.23.15).
+
 ## v2026.10.23.16
 
 - **Source and Display rows now carry the same information.** Display's second row starts with the output's dynamic range, like Source: `SDR · BT.2020`, `HDR · BT.2100` (it showed only the colorspace, so *SDR* on one side faced *BT.2020* on the other). The Lumagen reports no output dynamic range, so it is read from the output colorspace (BT.2100 = HDR, the others SDR) — the same rule as the *Tone map* label.

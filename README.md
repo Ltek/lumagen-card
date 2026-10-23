@@ -4,7 +4,7 @@ A Home Assistant Dashboard card for the **Lumagen Radiance Pro**. See what comes
 does with it and what reaches your screen, watch a live picture of how your aspect settings crop and
 scale it, and reach every everyday control from one card, set up in a visual editor.
 
-Current build: **v2026.10.23.16** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
+Current build: **v2026.10.23.17** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
 
 ```
  ▣  Lumagen ●                                Apple TV · HDR · 2.40
@@ -87,7 +87,7 @@ HACS → **⋮ → Custom repositories** → `https://github.com/Ltek/lumagen-ca
 ### Works with your setup
 - Finds the integration's entities by their translation keys, so **renamed entities keep working**.
 - Entities the integration leaves disabled simply don't appear: no empty rows, no error tiles.
-- On a narrow card the boxes stack.
+- **Phone-friendly:** the boxes stay side by side on a phone in portrait, and stack only on a very narrow card. Or choose always / never.
 
 ---
 
