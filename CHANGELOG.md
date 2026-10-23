@@ -1,5 +1,9 @@
 # Changelog
 
+## v2026.10.23.16
+
+- **Source and Display rows now carry the same information.** Display's second row starts with the output's dynamic range, like Source: `SDR · BT.2020`, `HDR · BT.2100` (it showed only the colorspace, so *SDR* on one side faced *BT.2020* on the other). The Lumagen reports no output dynamic range, so it is read from the output colorspace (BT.2100 = HDR, the others SDR) — the same rule as the *Tone map* label.
+
 ## v2026.10.23.15
 
 - **The aspects moved off the arrow into the boxes**, each on its own line in the theme color: the source aspect in Source, the output aspect (with *· NLS*) in Display. They are no longer joined with SDR / BT.2020. The arrow keeps only what the boxes don't show: *Scaled* and *Tone map*.

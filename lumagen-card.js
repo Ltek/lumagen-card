@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.23.15
+// Version: v2026.10.23.16
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.23.15';
+const BUILD_NUMBER = 'v2026.10.23.16';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -514,8 +514,16 @@ function lumagenProcessing({ srcRes, outRes, srcDr, outCs }) {
   const a = Number(srcRes);
   const b = Number(outRes);
   if (a > 0 && b > 0 && a !== b) lines.push('Scaled');
-  if (srcDr === 'HDR' && okState(outCs) && outCs !== 'BT.2100') lines.push('Tone map');
+  if (srcDr === 'HDR' && outputDynamicRange(outCs) === 'SDR') lines.push('Tone map');
   return lines;
+}
+
+/** The output's dynamic range, from the output colorspace the Lumagen reports (it reports no output
+ *  dynamic range of its own): BT.2100 is an HDR output, BT.2020 / 709 / 601 are SDR. */
+function outputDynamicRange(outCs) {
+  if (!okState(outCs)) return '';
+  if (outCs === 'BT.2100') return 'HDR';
+  return ['BT.2020', 'BT.709', 'BT.601'].includes(outCs) ? 'SDR' : '';
 }
 
 function fmtVideo(res, mode, rate) {
@@ -1185,7 +1193,9 @@ class LumagenCard extends HTMLElement {
     if (K.proc.title !== proc.join(' · ')) K.proc.title = proc.join(' · ');
     set('d_t', fmtVideo(v('out_res'), v('out_mode'), v('out_rate')));
     const outAr = parseAspect(v('out_aspect'));
-    set('d_1', okState(v('out_cs')) ? v('out_cs') : '');
+    // Same rows on both sides: resolution & rate, dynamic range (the source adds its mastering nits, the
+    // output its colorspace — the Lumagen reports no source colorspace and no output nits), aspect.
+    set('d_1', [outputDynamicRange(v('out_cs')), okState(v('out_cs')) ? v('out_cs') : ''].filter(Boolean).join(' · '));
     set('d_ar', outAr ? `${outAr.toFixed(2)}${v('nls') === 'True' ? ' · NLS' : ''}` : '');
     const mem = okState(v('memory')) ? String(v('memory')).slice(-1) : '—';
     // the Lumagen's settings, as chips at the start of the tag row
@@ -1909,7 +1919,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, STATUS_TAGS,
+  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);
