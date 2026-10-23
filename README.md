@@ -1,18 +1,10 @@
 # Lumagen Card
 
-A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
+A Home Assistant Dashboard card for the **Lumagen Radiance Pro**. See what comes in, what the Lumagen
+does with it and what reaches your screen, watch a live picture of how your aspect settings crop and
+scale it, and reach every everyday control from one card, set up in a visual editor.
 
-Current build: **v2026.10.23.16** · full history in [CHANGELOG.md](CHANGELOG.md)
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
-
-> Requires the **Lumagen integration**: [Ltek/lumagen](https://github.com/Ltek/lumagen) for every feature, or the original [jaysoffian/ha-lumagen](https://github.com/jaysoffian/ha-lumagen) by Jay Soffian, on which it is built (link health, hotplug, OSD test, CMS/Style, game mode and HDR metadata then hide themselves).
-
----
-
-## What it shows
-
-By default status sits on top (the order can be changed — see `section_order`). **Every control is in a collapsed section**, so nothing changes by accident; each collapsed header shows the current value.
+Current build: **v2026.10.23.16** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
 
 ```
  ▣  Lumagen ●                                Apple TV · HDR · 2.40
@@ -23,110 +15,88 @@ By default status sits on top (the order can be changed — see `section_order`)
  └───────────────────────┘            └───────────────────────┘
  (MEM D) (HDR) (Scope) [HDR] [AUTO AR]
       [source picture]   →   [your screen]
-   Content 2.40 in 1.78    Content 2.40 · Output 2.40
-          frame                on 2.40 screen
  Mastered 1000 nits · MaxCLL 850  ████████████░░░
  ▭ Aspect   2.40 · auto                           ›
  ▦ Remote                                         ›
  ⇥ Source   Apple TV · MEM D                      ›
- ◐ Picture  HDR · Scope                           ›
- ⚙ Admin & link                                   ›
 ```
 
-- **Header** — the icon is the power button: tap to turn the Lumagen on, **hold** for standby (a stray tap can't stop your movie). Without a hold — keyboard, screen reader — tap twice within 4 seconds: the first tap asks, the second confirms. The dot is the link: green = the Lumagen answers, red = link down; the summary reads *Offline* in red.
-- **Standby** — choose what the card does while the Lumagen is in standby / off: **hide the entire card**, **collapse to the header** (the default; you can still power on from it) or **keep expanded**. In the card editor it always starts expanded, so every section can be set up. Choose where the "Standby · tap the icon to power on" message goes (below, inline, hidden), or show a power button on the right. Optionally require a hold to turn on too, or hide the card while off (it always shows while you edit the Dashboard).
-- **Collapse** — optionally tap the header to collapse the card to just the header while the Lumagen is on, and start collapsed.
-- **Signal chain** — two boxes, **Source → Display**. *Source*: the input in the header (SOURCE · APPLE TV), the resolution & rate, dynamic range and mastering nits, then the source aspect on its own line in the theme color. *Display* (your display name): the output resolution & rate, its dynamic range with the colorspace (`SDR · BT.2020`, `HDR · BT.2100`), then the output aspect in the theme color (with *NLS* when it is on). *The arrow* says what the boxes don't: **Scaled** when the resolution changes, **Tone map** when an HDR source goes out as SDR (the Lumagen reports BT.2100 for an HDR output and BT.2020 / 709 / 601 for SDR); nothing for a straight passthrough. The rows line up: resolution & rate, then dynamic range, then aspect, on both sides. The Lumagen reports no output dynamic range of its own, so it is read from the output colorspace (BT.2100 = HDR, BT.2020 / 709 / 601 = SDR); it reports no source colorspace and no output nits, so those appear on one side only. The Lumagen's settings — memory, CMS, Style — are chips at the start of the tag row (hover for which is which). Long values wrap to two lines; on a narrow card the boxes stack.
-- **Tags** appear only when active: HDR, GAME, NLS, AUTO AR, 3D, NO SOURCE, TEST PATTERN, LINK DOWN. Each one can be hidden on its own: Sections → pencil on the signal chain → Settings (YAML: `hidden_items: [chain.tag_hdr, chain.tag_nls]`; ids `link`, `hdr`, `game`, `nls`, `auto`, `3d`, `nosource`, `test`).
-- **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **scaled into its output area the way the Lumagen does** — letterboxed or pillarboxed when the shapes differ, never distorted. **NLS** (a 16:9 or 4:3 picture on a wider screen) fills the output area the way the Lumagen does: mostly a horizontal stretch plus a slight vertical stretch that crops the top and bottom — the left screen outlines the part that is kept and says how much is cropped (*NLS crops 2.4% top & bottom*). Set `nls_vertical` to the vertical stretch in your Lumagen's NLS settings. A wrong setting shows the real crop or bars. A caption under each screen says what you see (*letterboxed*, *pillarboxed*, *top/bottom cropped*, *film bars kept*…). Zoom isn't shown (it can't be read over RS-232). Uses a built-in landscape, or your own picture. Option: show only the screen.
-- **HDR panel** (HDR sources) — mastering peak and minimum, and a MaxCLL bar.
-- **Aspect** — aspect chips (from the integration's *Aspect ratio menu* option), NLS and Reset auto aspect.
-- **Remote** — Menu / Exit / Clear / Help / OK and arrows; **hold an arrow to repeat it 5×**.
-- **Source** — input chips (your Lumagen labels) and memory A–D.
-- **Picture** — CMS and Style chips (your labels).
-- **Admin & link** (**hold to run**, or tap twice within 4 seconds) — Hotplug, Restart outputs, Reload config, OSD test, Clear OSD, ALT; link health, and a list of integration entities that are still disabled.
-- **Context tint** — accent normally, HDR color while HDR plays, game color in game mode.
+---
 
 ## Installation
 
-### HACS
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
-1. Click the badge above, or in HACS → **⋮ → Custom repositories** add `https://github.com/Ltek/lumagen-card`, category **Dashboard**.
-2. Install **Lumagen Card** and reload the browser.
+1. Click the button above. It opens HACS in your Home Assistant with this repository filled in.
+2. Add it, then click **Download**. HACS registers the Dashboard resource for you.
+3. Hard-refresh the browser (Ctrl/Cmd + Shift + R).
+4. On a dashboard: **+ Add card → Lumagen Card**. With one Lumagen there is nothing to set up; tell it
+   your screen's shape and name to get the most from the visualizer.
 
-### Manual
+The card is a **custom repository**, so searching HACS won't find it. If the button doesn't work:
+HACS → **⋮ → Custom repositories** → `https://github.com/Ltek/lumagen-card`, category **Dashboard**.
 
-Copy `lumagen-card.js` to `/config/www/`, then add it under **Settings → Dashboards → ⋮ → Resources** as `/local/lumagen-card.js` (JavaScript module).
+**Requires** a Lumagen integration:
 
-## Setup
+- [Ltek/lumagen](https://github.com/Ltek/lumagen) — **recommended**, for every feature.
+- or the original [jaysoffian/ha-lumagen](https://github.com/jaysoffian/ha-lumagen) by Jay Soffian, on
+  which it is built. Link health, hotplug, OSD test, CMS / Style, game mode and HDR metadata then hide
+  themselves.
 
-Add a card → search **Lumagen Card**. With one Lumagen there is nothing to configure. The card finds the integration's entities by their translation keys, so renamed entity IDs keep working.
+---
 
-Minimal YAML:
+## Features
 
-```yaml
-type: custom:lumagen-card
-```
+### See the whole signal chain
+- **Source → Display**, row for row: resolution and rate, dynamic range, aspect, so a 24 → 60 or
+  HDR → SDR change is obvious at a glance.
+- The arrow says what the Lumagen is doing: **Scaled** and **Tone map** (an HDR source sent out as SDR).
+- The aspects stand out in your theme color, with **NLS** next to the output aspect when it is on.
+- Your **memory, CMS and Style** as chips, next to tags for HDR, game mode, NLS, auto aspect, 3D, no
+  source and test pattern. Each tag can be turned off on its own.
+- The card **tints** in your HDR color while HDR plays, and your game color in game mode.
 
-### Optional entities
+### An aspect visualizer with a real picture
+- **Left:** the incoming frame, with the picture where it really is, letterbox bars and all.
+- **Right:** your screen, with the picture scaled into it **the way the Lumagen does**: letterboxed or
+  pillarboxed when the shapes differ, never distorted.
+- **NLS** is drawn like the real thing: mostly a horizontal stretch, plus a slight vertical stretch that
+  crops the top and bottom. The card shows how much is cropped, matched to your Lumagen's NLS setting.
+- A wrong aspect setting shows the real crop or bars, with a caption saying what you see.
+- Use the built-in landscape or your own picture; or show only the screen.
 
-The integration creates some entities **disabled by default**: CMS, Style, Reset Auto Aspect, Game Mode, HDR Max Mastering Luminance, HDR MaxCLL. Until you enable them their controls are simply absent (no error tiles), and the Admin drawer lists them. Enable them in **Settings → Devices & services → Lumagen → device → Entities**.
+### HDR details
+- For HDR sources: the mastering peak and minimum, and a MaxCLL bar.
 
-## Options
+### Everyday control without accidents
+- The header icon is the power button: **tap to turn on, hold for standby**, so a stray tap can't end
+  your movie. Keyboard and screen-reader users tap twice to confirm.
+- **Every control sits in a collapsed section**; each collapsed header shows the current value.
+- **Aspect** buttons, NLS and Reset auto aspect. **Remote** with menu keys and arrows; hold an arrow to
+  repeat it 5×. **Source**: your input labels and memory A–D. **Picture**: CMS and Style by name.
+- **Admin & link** (hold to run): hotplug, restart outputs, reload config, OSD test, link health, and
+  a list of integration entities you can still enable.
+- A link dot shows whether the Lumagen answers; in standby, hide the card, collapse it or keep it open.
 
-Everything is in the visual editor (Card (with the device picker) · Sections · Screen & visualizer · Buttons · Icons · Appearance). YAML keys are only written when they differ from the default.
+### Make it yours
+- **Reorder, rename, hide and merge sections**, and hide single settings or buttons you never use.
+- Your own icons, accent / HDR / game colors, and sizes and colors for every part of the card,
+  including the visualizer, from your theme or your own.
+- Everything is in the visual editor; YAML is optional. Only settings you change are saved.
 
-| Key | Default | Description |
-|---|---|---|
-| `device` | first Lumagen | Device ID, if you have more than one Lumagen. |
-| `title` | `Lumagen` | Header title. |
-| `when_off` | `collapse` | While the Lumagen is in standby / off: `hide` (hide the entire card), `collapse` (shrink to the header, so you can power on from it) or `expanded` (keep every section shown). The card editor always shows it expanded. The old `show_when_off: false` still works and means `hide`. |
-| `standby_text` | `below` | Standby message "Standby · tap the icon to power on": `below` the title, `inline` with it, or `hidden`. |
-| `standby_message` | stock text | Your own standby message; empty = "Standby · tap the icon to power on". |
-| `show_dot` | `true` | Show the link dot. |
-| `dot_position` | `title` | `title` (right of the title), `right` (far right), or `icon` (replaces the header icon; it is then the power button). |
-| `hide_aspects` · `hide_inputs` · `hide_memory` | | Buttons to hide — aspect ratios as shown (plus `nls`, `reset`), input numbers (e.g. `[3, 7]`), memory letters (e.g. `[A, C]`). The editor's **Buttons** panel lists your Lumagen's options. |
-| `standby_button` | `false` | In standby, replace the right-hand "Standby" with a power button that turns the Lumagen on. |
-| `power_hold_on` | `false` | Require a press-and-hold to turn **on** too (standby always needs a hold or a double tap). |
-| `collapsible` | `false` | Tap the header to collapse the card to just the header while the Lumagen is on. |
-| `start_collapsed` | `false` | With `collapsible`, start collapsed. |
-| `display_name` | `Display` | Heading of the third signal-chain box (e.g. your projector). |
-| `display_aspect` | `1.78` | Your screen shape (e.g. `2.40` for a scope screen). |
-| `nls_vertical` | `5` | NLS vertical stretch in percent (0–25), as set in the Lumagen's NLS menu. With NLS on, the visualizer stretches the picture this much vertically (cropping the top and bottom) and the rest horizontally; never more vertically than the widening needs. `0` = a purely horizontal stretch. Editor: Screen → Visualizer. |
-| `viz_after_only` | `false` | Show only the screen (result) and its caption. |
-| `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
-| `section_order` | default order | Order of the card's parts: any of `chain`, `visualizer`, `hdr`, `aspects`, `remote`, `source`, `picture`, `admin`. Missing ones are added at the end in default order. The editor's *Sections* list sets this with ↑/↓. |
-| `section_names` | | Your own name per section, e.g. `{ remote: Menu keys }`. Editor: the **pencil** on a section row → Name. |
-| `hidden_items` | | Single settings to hide, as `section.setting`, e.g. `chain.lumagen` (the memory / CMS / Style chips), `chain.proc` (the processing on the arrow), `chain.tag_hdr`, `admin.alt`. Editor: pencil → **Settings**, one eye per setting. Settings that already have their own option (menu shortcuts, flows…) use that option instead. |
-| `section_merge` | | Show a section's settings inside another section, e.g. `picture: source`: the section disappears and its visible settings appear at the end of the target, under its name. Not into a hidden section, and no chains (a section others merge into stays its own), `hdr` cannot merge. Editor: pencil → **Merge**. |
-| `show_chain` · `show_visualizer` · `show_hdr` · `show_aspects` · `show_remote` · `show_source` · `show_picture` · `show_admin` | `true` | Turn parts off. |
-| `show_inputs` · `show_memory` | `true` | Hide only the Inputs or Memory row of the Source section. |
-| `accent_color` · `hdr_color` · `game_color` | theme primary · amber · green | Context colors. |
-| `icons:` | | `header`, `aspect`, `remote`, `source`, `picture`, `admin` — any MDI name; `mdi:` is optional. |
-| `styles:` | | Sizes (px) and colors (any CSS color or theme variable) — see below. |
+### Works with your setup
+- Finds the integration's entities by their translation keys, so **renamed entities keep working**.
+- Entities the integration leaves disabled simply don't appear: no empty rows, no error tiles.
+- On a narrow card the boxes stack.
 
-**`styles:` keys** — sizes: `card_radius` `card_padding` `standby_indent` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size` `viz_border_width`; colors: `card_background` `card_border_color` `box_background` `divider_color` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color` `viz_border_color`.
-
-Backgrounds and borders (`card_background`, `card_border_color`, `box_background`, `divider_color`, `chip_background`, `chip_border_color`) also accept `transparent` — the editor offers it as a choice.
-
-Example — scope screen, bigger visualizer, custom icons:
-
-```yaml
-type: custom:lumagen-card
-display_name: JVC NZ8
-display_aspect: 2.4
-icons:
-  header: movie-open
-  remote: remote-tv
-styles:
-  viz_height: 110
-  title_color: var(--accent-color)
-  card_background: "#0d1b2a"
-```
+---
 
 ## Credits
 
-- **[Jay Soffian](https://github.com/jaysoffian)** — the original [ha-lumagen](https://github.com/jaysoffian/ha-lumagen) integration this card is designed around.
+- **[Jay Soffian](https://github.com/jaysoffian)** — the original [ha-lumagen](https://github.com/jaysoffian/ha-lumagen)
+  integration this card is designed around.
 - [Lumagen](https://www.lumagen.com) for the published [RS-232 command interface](https://www.lumagen.com/s/Tip0011_RS232CommandInterface_111023.pdf).
+- Same design as the [JVC Projector Card](https://github.com/Ltek/jvc-projector-card) and the
+  [StormAudio Card](https://github.com/Ltek/stormaudio-card).
 
 MIT licensed — see [LICENSE](LICENSE).
