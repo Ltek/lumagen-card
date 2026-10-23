@@ -2,7 +2,7 @@
 
 A Home Assistant Dashboard **custom card** for the **Lumagen Radiance Pro**: the signal chain from source to screen, an aspect visualizer drawn from the live ratios, HDR details, one-tap controls, a menu remote and an admin drawer — all in one card with a visual editor.
 
-Current build: **v2026.10.23.14** · full history in [CHANGELOG.md](CHANGELOG.md)
+Current build: **v2026.10.23.15** · full history in [CHANGELOG.md](CHANGELOG.md)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Ltek&repository=lumagen-card&category=plugin)
 
@@ -18,10 +18,10 @@ By default status sits on top (the order can be changed — see `section_order`)
  ▣  Lumagen ●                                Apple TV · HDR · 2.40
  ┌ SOURCE · APPLE TV ────┐            ┌ JVC ──────────────────┐
  │ 2160p24               │  Tone map  │ 2160p24               │
- │ HDR · 1000 nits · 2.40│  ───────►  │ BT.2020 · 2.40        │
+ │ HDR · 1000 nits       │  ───────►  │ BT.2020               │
+ │ 2.40                  │            │ 2.40                  │
  └───────────────────────┘            └───────────────────────┘
- LUMAGEN  MEM D · HDR · Scope
- [HDR] [AUTO AR]
+ (MEM D) (HDR) (Scope) [HDR] [AUTO AR]
       [source picture]   →   [your screen]
    Content 2.40 in 1.78    Content 2.40 · Output 2.40
           frame                on 2.40 screen
@@ -36,7 +36,7 @@ By default status sits on top (the order can be changed — see `section_order`)
 - **Header** — the icon is the power button: tap to turn the Lumagen on, **hold** for standby (a stray tap can't stop your movie). Without a hold — keyboard, screen reader — tap twice within 4 seconds: the first tap asks, the second confirms. The dot is the link: green = the Lumagen answers, red = link down; the summary reads *Offline* in red.
 - **Standby** — choose what the card does while the Lumagen is in standby / off: **hide the entire card**, **collapse to the header** (the default; you can still power on from it) or **keep expanded**. In the card editor it always starts expanded, so every section can be set up. Choose where the "Standby · tap the icon to power on" message goes (below, inline, hidden), or show a power button on the right. Optionally require a hold to turn on too, or hide the card while off (it always shows while you edit the Dashboard).
 - **Collapse** — optionally tap the header to collapse the card to just the header while the Lumagen is on, and start collapsed.
-- **Signal chain** — two boxes, **Source → Display**, with what the Lumagen does written on the arrow. *Source*: the input in the header (SOURCE · APPLE TV), the resolution & rate, then dynamic range, mastering nits and the source aspect. *The arrow*: **Scaled** when the resolution changes, **Tone map** when an HDR source goes out as SDR (the Lumagen reports BT.2100 for an HDR output and BT.2020 / 709 / 601 for SDR), and the aspect change, e.g. **1.78 → 2.00 NLS**; nothing for a straight passthrough. *Display* (your display name): the output resolution & rate, then colorspace and output aspect. Under the boxes, one line with the Lumagen's settings: memory, CMS and Style, with room for full names. Long values wrap to two lines; on a narrow card the boxes stack.
+- **Signal chain** — two boxes, **Source → Display**. *Source*: the input in the header (SOURCE · APPLE TV), the resolution & rate, dynamic range and mastering nits, then the source aspect on its own line in the theme color. *Display* (your display name): the output resolution & rate, the colorspace, then the output aspect in the theme color (with *NLS* when it is on). *The arrow* says what the boxes don't: **Scaled** when the resolution changes, **Tone map** when an HDR source goes out as SDR (the Lumagen reports BT.2100 for an HDR output and BT.2020 / 709 / 601 for SDR); nothing for a straight passthrough. The Lumagen's settings — memory, CMS, Style — are chips at the start of the tag row (hover for which is which). Long values wrap to two lines; on a narrow card the boxes stack.
 - **Tags** appear only when active: HDR, GAME, NLS, AUTO AR, 3D, NO SOURCE, TEST PATTERN, LINK DOWN. Each one can be hidden on its own: Sections → pencil on the signal chain → Settings (YAML: `hidden_items: [chain.tag_hdr, chain.tag_nls]`; ids `link`, `hdr`, `game`, `nls`, `auto`, `3d`, `nosource`, `test`).
 - **Aspect visualizer with a real picture** — left: the incoming frame with the picture where it really is (letterbox bars and all), and a dashed outline when the Lumagen is set to a different aspect than the content. Right: *your* screen, with the region the Lumagen is set to **scaled into its output area the way the Lumagen does** — letterboxed or pillarboxed when the shapes differ, never distorted. **NLS** (a 16:9 or 4:3 picture on a wider screen) fills the output area the way the Lumagen does: mostly a horizontal stretch plus a slight vertical stretch that crops the top and bottom — the left screen outlines the part that is kept and says how much is cropped (*NLS crops 2.4% top & bottom*). Set `nls_vertical` to the vertical stretch in your Lumagen's NLS settings. A wrong setting shows the real crop or bars. A caption under each screen says what you see (*letterboxed*, *pillarboxed*, *top/bottom cropped*, *film bars kept*…). Zoom isn't shown (it can't be read over RS-232). Uses a built-in landscape, or your own picture. Option: show only the screen.
 - **HDR panel** (HDR sources) — mastering peak and minimum, and a MaxCLL bar.
@@ -97,7 +97,7 @@ Everything is in the visual editor (Card (with the device picker) · Sections ·
 | `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
 | `section_order` | default order | Order of the card's parts: any of `chain`, `visualizer`, `hdr`, `aspects`, `remote`, `source`, `picture`, `admin`. Missing ones are added at the end in default order. The editor's *Sections* list sets this with ↑/↓. |
 | `section_names` | | Your own name per section, e.g. `{ remote: Menu keys }`. Editor: the **pencil** on a section row → Name. |
-| `hidden_items` | | Single settings to hide, as `section.setting`, e.g. `chain.lumagen` (the Lumagen line), `chain.proc` (the processing on the arrow), `chain.tag_hdr`, `admin.alt`. Editor: pencil → **Settings**, one eye per setting. Settings that already have their own option (menu shortcuts, flows…) use that option instead. |
+| `hidden_items` | | Single settings to hide, as `section.setting`, e.g. `chain.lumagen` (the memory / CMS / Style chips), `chain.proc` (the processing on the arrow), `chain.tag_hdr`, `admin.alt`. Editor: pencil → **Settings**, one eye per setting. Settings that already have their own option (menu shortcuts, flows…) use that option instead. |
 | `section_merge` | | Show a section's settings inside another section, e.g. `picture: source`: the section disappears and its visible settings appear at the end of the target, under its name. Not into a hidden section, and no chains (a section others merge into stays its own), `hdr` cannot merge. Editor: pencil → **Merge**. |
 | `show_chain` · `show_visualizer` · `show_hdr` · `show_aspects` · `show_remote` · `show_source` · `show_picture` · `show_admin` | `true` | Turn parts off. |
 | `show_inputs` · `show_memory` | `true` | Hide only the Inputs or Memory row of the Source section. |

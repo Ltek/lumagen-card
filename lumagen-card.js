@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.23.14
+// Version: v2026.10.23.15
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.23.14';
+const BUILD_NUMBER = 'v2026.10.23.15';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -252,7 +252,7 @@ const STATUS_TAGS = [['link', 'LINK DOWN'], ['hdr', 'HDR'], ['game', 'GAME'], ['
 // a show key is the card's own option (its eye toggles that key); the rest use hidden_items.
 const SECTION_ITEMS = {
   chain: [['source', 'Source box', '[data-item="box-src"]'], ['proc', 'Processing on the arrow (scaled, tone map, aspect)', '[data-item="proc"]'],
-    ['display', 'Display box', '[data-item="box-disp"]'], ['lumagen', 'Lumagen line (memory, CMS, style)', '[data-item="box-lmg"]'],
+    ['display', 'Display box', '[data-item="box-disp"]'], ['lumagen', 'Lumagen settings chips (memory, CMS, style)', '[data-item="box-lmg"]'],
     ['tags', 'Status tags (all)', '[data-k="tags"]'],
     ...STATUS_TAGS.map(([id, label]) => [`tag_${id}`, `Tag: ${label}`, `[data-tag="${id}"]`])],
   visualizer: [['before', 'Source frame (before)', '[data-k="before"], .lmg-viz-arrow'], ['after', 'Screen (after)', '[data-item="viz-after"]']],
@@ -506,21 +506,15 @@ function vizResult({ content, selected, output, screen, nls }, g) {
   return out.join(' · ');
 }
 
-/** What the Lumagen does to the signal, as short lines for the arrow between Source and Display:
- *  'Scaled' (the resolution changes), 'Tone map' (an HDR source sent out as SDR: the Lumagen reports
- *  BT.2100 for an HDR output and BT.2020 / 709 / 601 for SDR), and the aspect change ('1.78 → 2.00',
- *  with NLS). Nothing for a straight passthrough. */
-function lumagenProcessing({ srcRes, outRes, srcDr, outCs, srcAspect, outAspect, nls }) {
+/** What the Lumagen does to the signal that the boxes don't show, as short lines on the arrow:
+ *  'Scaled' (the resolution changes) and 'Tone map' (an HDR source sent out as SDR: the Lumagen
+ *  reports BT.2100 for an HDR output and BT.2020 / 709 / 601 for SDR). The aspects are in the boxes. */
+function lumagenProcessing({ srcRes, outRes, srcDr, outCs }) {
   const lines = [];
   const a = Number(srcRes);
   const b = Number(outRes);
   if (a > 0 && b > 0 && a !== b) lines.push('Scaled');
   if (srcDr === 'HDR' && okState(outCs) && outCs !== 'BT.2100') lines.push('Tone map');
-  const sa = parseAspect(srcAspect);
-  const oa = parseAspect(outAspect);
-  const n = nls === true || nls === 'True';
-  if (sa && oa && Math.abs(sa - oa) > 0.005) lines.push(`${sa.toFixed(2)} → ${oa.toFixed(2)}${n ? ' NLS' : ''}`);
-  else if (n) lines.push('NLS');
   return lines;
 }
 
@@ -645,10 +639,7 @@ const CARD_CSS = `
 .lmg-link-l { text-align: center; line-height: 1.2; font-size: var(--lmg-subtitle-size, 10px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-link-l > div:first-child { font-size: var(--lmg-secondary-size, 12px); font-weight: 600; color: var(--lmg-ctx); }
 .lmg-link-l:empty { display: none; }
-.lmg-strip { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: var(--lmg-box);
-  font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
-.lmg-strip-h { flex: 0 0 auto; font-size: var(--lmg-subtitle-size, 10px); letter-spacing: .08em; text-transform: uppercase; color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
-.lmg-strip-v { min-width: 0; color: var(--lmg-text-color, var(--primary-text-color)); overflow-wrap: anywhere; }
+.lmg-ar { color: var(--lmg-ctx); font-weight: 600; }
 .lmg-status { container-type: inline-size; }
 /* Narrow card: stack Source over Display, the arrow points down with the processing beside it. */
 @container (max-width: 360px) {
@@ -658,7 +649,8 @@ const CARD_CSS = `
 }
 .lmg-arrow { align-self: center; color: var(--lmg-icon-color, var(--lmg-ctx)); --mdc-icon-size: 18px; }
 .lmg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.lmg-tags:empty { display: none; }
+.lmg-tagset { display: contents; }
+.lmg-tag.set { color: var(--lmg-secondary-color, var(--secondary-text-color)); text-transform: none; letter-spacing: 0; font-weight: 500; }
 .lmg-tag { padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 11px; font-weight: 600;
   letter-spacing: .04em; color: var(--secondary-text-color); }
 .lmg-tag.hdr { color: var(--lmg-hdr, #ffb300); }
@@ -826,12 +818,11 @@ class LumagenCard extends HTMLElement {
       chain: `
           <div class="lmg-status" data-sec="chain">
             <div class="lmg-chain">
-              <div class="lmg-box" data-item="box-src"><div class="lmg-box-h" data-k="s_h">Source</div><div class="lmg-box-t" data-k="s_t"></div><div class="lmg-box-s" data-k="s_1"></div></div>
+              <div class="lmg-box" data-item="box-src"><div class="lmg-box-h" data-k="s_h">Source</div><div class="lmg-box-t" data-k="s_t"></div><div class="lmg-box-s" data-k="s_1"></div><div class="lmg-box-s lmg-ar" data-k="s_ar"></div></div>
               <div class="lmg-link"><div class="lmg-link-l" data-item="proc" data-k="proc"></div><ha-icon class="lmg-arrow" icon="mdi:arrow-right"></ha-icon></div>
-              <div class="lmg-box" data-item="box-disp"><div class="lmg-box-h">${esc(cfg(c, 'display_name'))}</div><div class="lmg-box-t" data-k="d_t"></div><div class="lmg-box-s" data-k="d_1"></div></div>
+              <div class="lmg-box" data-item="box-disp"><div class="lmg-box-h">${esc(cfg(c, 'display_name'))}</div><div class="lmg-box-t" data-k="d_t"></div><div class="lmg-box-s" data-k="d_1"></div><div class="lmg-box-s lmg-ar" data-k="d_ar"></div></div>
             </div>
-            <div class="lmg-strip" data-item="box-lmg"><span class="lmg-strip-h">Lumagen</span><span class="lmg-strip-v" data-k="l_t"></span></div>
-            <div class="lmg-tags" data-k="tags"></div>
+            <div class="lmg-tags" data-k="chips"><span class="lmg-tagset" data-item="box-lmg" data-k="l_t"></span><span class="lmg-tagset" data-k="tags"></span></div>
           </div>
 `,
       visualizer: `
@@ -1187,18 +1178,19 @@ class LumagenCard extends HTMLElement {
     set('s_t', srcVideo);
     const nits = v('src_dr') === 'HDR' && okState(v('hdr_max')) ? ` · ${Math.round(Number(v('hdr_max')))} nits` : '';
     const srcAr = parseAspect(v('src_content'));
-    set('s_1', [okState(v('src_dr')) ? v('src_dr') + nits : '', srcAr ? srcAr.toFixed(2) : ''].filter(Boolean).join(' · '));
-    const proc = srcVideo === '—' ? [] : lumagenProcessing({ srcRes: v('src_res'), outRes: v('out_res'), srcDr: v('src_dr'), outCs: v('out_cs'),
-      srcAspect: v('src_content'), outAspect: v('out_aspect'), nls: v('nls') });
+    set('s_1', okState(v('src_dr')) ? v('src_dr') + nits : '');
+    set('s_ar', srcAr ? srcAr.toFixed(2) : '');
+    const proc = srcVideo === '—' ? [] : lumagenProcessing({ srcRes: v('src_res'), outRes: v('out_res'), srcDr: v('src_dr'), outCs: v('out_cs') });
     html(K.proc, proc.map((x) => `<div>${esc(x)}</div>`).join(''));
     if (K.proc.title !== proc.join(' · ')) K.proc.title = proc.join(' · ');
     set('d_t', fmtVideo(v('out_res'), v('out_mode'), v('out_rate')));
     const outAr = parseAspect(v('out_aspect'));
-    set('d_1', [okState(v('out_cs')) ? v('out_cs') : '', outAr ? outAr.toFixed(2) : ''].filter(Boolean).join(' · '));
+    set('d_1', okState(v('out_cs')) ? v('out_cs') : '');
+    set('d_ar', outAr ? `${outAr.toFixed(2)}${v('nls') === 'True' ? ' · NLS' : ''}` : '');
     const mem = okState(v('memory')) ? String(v('memory')).slice(-1) : '—';
-    set('l_t', [mem !== '—' ? `MEM ${mem}` : '', v('cms_label'), v('style_label')].filter(okState).join(' · '));
-    const strip = this.querySelector('[data-item="box-lmg"]');
-    if (strip) strip.hidden = !K.l_t.textContent;
+    // the Lumagen's settings, as chips at the start of the tag row
+    const settings = [['Memory', mem !== '—' ? `MEM ${mem}` : ''], ['CMS', v('cms_label')], ['Style', v('style_label')]].filter(([, x]) => okState(x));
+    html(K.l_t, settings.map(([n, x]) => `<span class="lmg-tag set" title="${esc(n)}">${esc(x)}</span>`).join(''));
 
     // tags — each can be hidden (hidden_items: chain.tag_<id>)
     const tags = [];
@@ -1273,6 +1265,8 @@ class LumagenCard extends HTMLElement {
     K.missing.hidden = !missing.length;
 
     this._applyItems();
+    // the chip row (settings + tags) shows only while it has a visible chip
+    if (K.chips) K.chips.hidden = ![...K.chips.querySelectorAll('.lmg-tag')].some((x) => !x.closest('.lmg-uhide'));
     this._applyVisibility();
   }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.10.23.15
+
+- **The aspects moved off the arrow into the boxes**, each on its own line in the theme color: the source aspect in Source, the output aspect (with *· NLS*) in Display. They are no longer joined with SDR / BT.2020. The arrow keeps only what the boxes don't show: *Scaled* and *Tone map*.
+- **Memory, CMS and Style are chips** at the start of the tag row (hover for which is which) instead of a separate "Lumagen" strip. `chain.lumagen` hides these chips; the row hides itself when nothing in it is shown.
+
 ## v2026.10.23.14
 
 - **Signal chain is two boxes, Source → Display, with what the Lumagen does on the arrow.** Each box has about half the width, so input names and values fit.
