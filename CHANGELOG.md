@@ -1,5 +1,17 @@
 # Changelog
 
+## v2026.10.23.14
+
+- **Signal chain is two boxes, Source → Display, with what the Lumagen does on the arrow.** Each box has about half the width, so input names and values fit.
+  - **Source**: the input in the header (SOURCE · APPLE TV), resolution & rate, then dynamic range, nits and the source aspect.
+  - **Arrow**: *Scaled* (resolution changes), *Tone map* (HDR source sent out as SDR — detected from the output colorspace: BT.2100 is an HDR output, BT.2020 / 709 / 601 are SDR), and the aspect change (*1.78 → 2.00 NLS*). Empty for a passthrough.
+  - **Display**: output resolution & rate, then colorspace and output aspect.
+  - **Lumagen line** under the boxes: memory, CMS and Style, full names (it was the cramped middle box).
+- **Each status tag can be hidden on its own** (Sections → pencil on the signal chain → Settings; `hidden_items: [chain.tag_hdr, …]`). All are shown by default.
+- Long values wrap to two lines instead of being cut off; empty lines disappear instead of showing "—". On a narrow card the boxes stack, with the arrow pointing down.
+- **The visualizer's pictures are centered.** A long caption made its column wider than its picture, which pushed the pictures off center; captions now wrap under their picture.
+- `chain.lumagen` in `hidden_items` now hides the Lumagen line.
+
 ## v2026.10.22.13
 
 - **NLS crops the top and bottom, like the Lumagen.** With NLS on (e.g. 16:9 on a 2.00 screen), the visualizer now applies a slight vertical stretch — the picture loses a little at the top and bottom — and stretches the rest horizontally, instead of a purely horizontal stretch. The source screen outlines the part that is kept and says how much is cropped (*NLS crops 2.4% top & bottom*); the screen caption reads *top/bottom cropped · NLS stretch*. New `nls_vertical` (default 5 %, Screen → Visualizer): set it to your Lumagen's NLS vertical stretch; `0` is the old horizontal-only stretch. The vertical stretch never goes beyond what the widening needs (e.g. 16:9 → 1.85). Pictures without NLS are unchanged: always scaled uniformly.

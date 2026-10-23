@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.22.13
+// Version: v2026.10.23.14
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.22.13';
+const BUILD_NUMBER = 'v2026.10.23.14';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -222,7 +222,7 @@ const STYLE_GROUPS = [
   ['header', 'Header', 'Icon, title and the live summary on the right.'],
   ['sections', 'Section headers', 'The collapsible Aspect / Remote / Source / Picture / Admin rows.'],
   ['subtitles', 'Subtitles', 'Box headings (SOURCE / LUMAGEN / DISPLAY) and row labels (Input, Memory…).'],
-  ['text', 'Values', 'Main values in the signal chain boxes.'],
+  ['text', 'Values', 'Main values in the Source and Display boxes.'],
   ['secondary', 'Details text', 'Second lines, HDR details, link and notes.'],
   ['chips', 'Chips & buttons', 'Input / aspect / CMS / admin buttons. Active chips use the context color.'],
   ['icons', 'Icons', 'Remote key icons and the signal-chain arrows.'],
@@ -241,14 +241,20 @@ const HIDE_LISTS = {
 // Ancestors that mean "the Dashboard is being edited / this is the editor preview".
 const EDITOR_WRAPPERS = ['hui-card-preview', 'hui-dialog-edit-card', 'hui-card-edit-mode', 'hui-card-options', 'hui-section-edit-mode'];
 
+// Status tags: [id, label]. Each can be hidden on its own (hidden_items: chain.tag_<id>).
+const STATUS_TAGS = [['link', 'LINK DOWN'], ['hdr', 'HDR'], ['game', 'GAME'], ['nls', 'NLS'], ['auto', 'AUTO AR'],
+  ['3d', '3D'], ['nosource', 'NO SOURCE'], ['test', 'TEST PATTERN']];
+
 // ---------------------------------------------------------------------------
 // Section editing (editor: pencil on a section row): rename, hide single settings, merge.
 // ---------------------------------------------------------------------------
 // Per-section settings the user can hide: [id, label, selector, existing show key?]. A setting with
 // a show key is the card's own option (its eye toggles that key); the rest use hidden_items.
 const SECTION_ITEMS = {
-  chain: [['source', 'Source box', '[data-item="box-src"]'], ['lumagen', 'Lumagen box', '[data-item="box-lmg"]'],
-    ['display', 'Display box', '[data-item="box-disp"]'], ['tags', 'Status tags', '[data-k="tags"]']],
+  chain: [['source', 'Source box', '[data-item="box-src"]'], ['proc', 'Processing on the arrow (scaled, tone map, aspect)', '[data-item="proc"]'],
+    ['display', 'Display box', '[data-item="box-disp"]'], ['lumagen', 'Lumagen line (memory, CMS, style)', '[data-item="box-lmg"]'],
+    ['tags', 'Status tags (all)', '[data-k="tags"]'],
+    ...STATUS_TAGS.map(([id, label]) => [`tag_${id}`, `Tag: ${label}`, `[data-tag="${id}"]`])],
   visualizer: [['before', 'Source frame (before)', '[data-k="before"], .lmg-viz-arrow'], ['after', 'Screen (after)', '[data-item="viz-after"]']],
   hdr: [],
   aspects: [['chips', 'Aspect buttons', '[data-opts="aspect"]'], ['nls', 'NLS button', '[data-a="nls_btn"]'], ['reset', 'Reset auto button', '[data-a="reset_aa"]']],
@@ -500,6 +506,24 @@ function vizResult({ content, selected, output, screen, nls }, g) {
   return out.join(' · ');
 }
 
+/** What the Lumagen does to the signal, as short lines for the arrow between Source and Display:
+ *  'Scaled' (the resolution changes), 'Tone map' (an HDR source sent out as SDR: the Lumagen reports
+ *  BT.2100 for an HDR output and BT.2020 / 709 / 601 for SDR), and the aspect change ('1.78 → 2.00',
+ *  with NLS). Nothing for a straight passthrough. */
+function lumagenProcessing({ srcRes, outRes, srcDr, outCs, srcAspect, outAspect, nls }) {
+  const lines = [];
+  const a = Number(srcRes);
+  const b = Number(outRes);
+  if (a > 0 && b > 0 && a !== b) lines.push('Scaled');
+  if (srcDr === 'HDR' && okState(outCs) && outCs !== 'BT.2100') lines.push('Tone map');
+  const sa = parseAspect(srcAspect);
+  const oa = parseAspect(outAspect);
+  const n = nls === true || nls === 'True';
+  if (sa && oa && Math.abs(sa - oa) > 0.005) lines.push(`${sa.toFixed(2)} → ${oa.toFixed(2)}${n ? ' NLS' : ''}`);
+  else if (n) lines.push('NLS');
+  return lines;
+}
+
 function fmtVideo(res, mode, rate) {
   if (!okState(res) || Number(res) === 0) return '—';
   return `${res}${mode === 'Interlaced' ? 'i' : 'p'}${okState(rate) && Number(rate) ? rate : ''}`;
@@ -611,10 +635,27 @@ const CARD_CSS = `
   color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
 .lmg-box { min-width: 0; padding: 8px 6px; border-radius: 10px; text-align: center; background: var(--lmg-box); }
 .lmg-box-h { font-size: var(--lmg-subtitle-size, 10px); letter-spacing: .08em; text-transform: uppercase; color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
-.lmg-box-t { font-size: var(--lmg-text-size, 14px); font-weight: 600; color: var(--lmg-text-color, var(--primary-text-color));
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lmg-box-s { font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color));
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lmg-box-h { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lmg-box-t { font-size: var(--lmg-text-size, 14px); font-weight: 600; color: var(--lmg-text-color, var(--primary-text-color)); line-height: 1.25;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.lmg-box-s { font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); line-height: 1.3;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.lmg-box-s:empty { display: none; }
+.lmg-link { flex: 0 0 auto; max-width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0 2px; }
+.lmg-link-l { text-align: center; line-height: 1.2; font-size: var(--lmg-subtitle-size, 10px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-link-l > div:first-child { font-size: var(--lmg-secondary-size, 12px); font-weight: 600; color: var(--lmg-ctx); }
+.lmg-link-l:empty { display: none; }
+.lmg-strip { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: var(--lmg-box);
+  font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-strip-h { flex: 0 0 auto; font-size: var(--lmg-subtitle-size, 10px); letter-spacing: .08em; text-transform: uppercase; color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
+.lmg-strip-v { min-width: 0; color: var(--lmg-text-color, var(--primary-text-color)); overflow-wrap: anywhere; }
+.lmg-status { container-type: inline-size; }
+/* Narrow card: stack Source over Display, the arrow points down with the processing beside it. */
+@container (max-width: 360px) {
+  .lmg-status .lmg-chain { flex-direction: column; }
+  .lmg-status .lmg-link { max-width: none; flex-direction: row-reverse; gap: 6px; }
+  .lmg-status .lmg-arrow { transform: rotate(90deg); }
+}
 .lmg-arrow { align-self: center; color: var(--lmg-icon-color, var(--lmg-ctx)); --mdc-icon-size: 18px; }
 .lmg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .lmg-tags:empty { display: none; }
@@ -628,7 +669,9 @@ const CARD_CSS = `
 .lmg-scr { display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .lmg-scr > svg { display: block; height: var(--lmg-viz-height, 72px); width: auto; max-width: 100%; overflow: visible; }
 .lmg-viz-arrow { align-self: flex-start; margin-top: calc(var(--lmg-viz-height, 72px) / 2 - 9px); color: var(--lmg-icon-color, var(--secondary-text-color)); --mdc-icon-size: 18px; }
-.lmg-cap { margin-top: 4px; text-align: center; font-size: var(--lmg-caption-size, 11px); line-height: 1.35;
+/* A caption never widens its column (width 0, then stretched to the picture's width): it wraps under
+   the picture, so both pictures and the arrow stay centered in the row. */
+.lmg-cap { width: 0; min-width: 100%; margin-top: 4px; text-align: center; font-size: var(--lmg-caption-size, 11px); line-height: 1.35;
   color: var(--lmg-caption-color, var(--secondary-text-color)); }
 .lmg-cap b { color: var(--lmg-text-color, var(--primary-text-color)); font-weight: 600; }
 .lmg-frame { fill: #000; }
@@ -781,14 +824,13 @@ class LumagenCard extends HTMLElement {
     if (this._collapsed === undefined) this._collapsed = cfg(c, 'collapsible') && cfg(c, 'start_collapsed');
     const parts = {
       chain: `
-          <div data-sec="chain">
+          <div class="lmg-status" data-sec="chain">
             <div class="lmg-chain">
-              <div class="lmg-box" data-item="box-src"><div class="lmg-box-h">Source</div><div class="lmg-box-t" data-k="s_t"></div><div class="lmg-box-s" data-k="s_1"></div><div class="lmg-box-s" data-k="s_2"></div></div>
-              <ha-icon class="lmg-arrow" icon="mdi:chevron-right"></ha-icon>
-              <div class="lmg-box" data-item="box-lmg"><div class="lmg-box-h">Lumagen</div><div class="lmg-box-t" data-k="l_t"></div><div class="lmg-box-s" data-k="l_1"></div><div class="lmg-box-s" data-k="l_2"></div></div>
-              <ha-icon class="lmg-arrow" icon="mdi:chevron-right"></ha-icon>
-              <div class="lmg-box" data-item="box-disp"><div class="lmg-box-h">${esc(cfg(c, 'display_name'))}</div><div class="lmg-box-t" data-k="d_t"></div><div class="lmg-box-s" data-k="d_1"></div><div class="lmg-box-s" data-k="d_2"></div></div>
+              <div class="lmg-box" data-item="box-src"><div class="lmg-box-h" data-k="s_h">Source</div><div class="lmg-box-t" data-k="s_t"></div><div class="lmg-box-s" data-k="s_1"></div></div>
+              <div class="lmg-link"><div class="lmg-link-l" data-item="proc" data-k="proc"></div><ha-icon class="lmg-arrow" icon="mdi:arrow-right"></ha-icon></div>
+              <div class="lmg-box" data-item="box-disp"><div class="lmg-box-h">${esc(cfg(c, 'display_name'))}</div><div class="lmg-box-t" data-k="d_t"></div><div class="lmg-box-s" data-k="d_1"></div></div>
             </div>
+            <div class="lmg-strip" data-item="box-lmg"><span class="lmg-strip-h">Lumagen</span><span class="lmg-strip-v" data-k="l_t"></span></div>
             <div class="lmg-tags" data-k="tags"></div>
           </div>
 `,
@@ -1030,10 +1072,11 @@ class LumagenCard extends HTMLElement {
       const kids = [...chain.children];
       const boxes = kids.filter((el) => el.classList.contains('lmg-box'));
       const shown = boxes.filter((el) => !el.classList.contains('lmg-uhide'));
-      kids.forEach((el) => { if (el.classList.contains('lmg-arrow')) el.classList.add('lmg-uhide'); });
+      const isLink = (el) => el.classList.contains('lmg-arrow') || el.classList.contains('lmg-link');
+      kids.forEach((el) => { if (isLink(el)) el.classList.add('lmg-uhide'); });
       shown.slice(1).forEach((b) => {
         const prev = kids[kids.indexOf(b) - 1];
-        if (prev && prev.classList.contains('lmg-arrow')) prev.classList.remove('lmg-uhide');
+        if (prev && isLink(prev)) prev.classList.remove('lmg-uhide');
       });
       chain.classList.toggle('lmg-uhide', boxes.length > 0 && shown.length === 0);
     });
@@ -1137,31 +1180,38 @@ class LumagenCard extends HTMLElement {
       if (el.hidden && sectionShown(c, el.dataset.sec) && el.querySelector(':scope > .lmg-merged:not([hidden])')) el.hidden = false;
     });
 
-    // signal chain
-    const lbl = okState(v('input_label')) ? v('input_label') : okState(v('logical_input')) ? `Input ${v('logical_input')}` : '—';
-    set('s_t', lbl);
-    set('s_1', fmtVideo(v('src_res'), v('src_mode'), v('src_rate')));
-    const nits = isHdr && okState(v('hdr_max')) ? ` ${Math.round(Number(v('hdr_max')))} nits` : '';
-    set('s_2', okState(v('src_dr')) ? v('src_dr') + nits : '—');
-    const mem = okState(v('memory')) ? String(v('memory')).slice(-1) : '—';
-    set('l_t', `MEM ${mem}`);
-    set('l_1', okState(v('cms_label')) ? v('cms_label') : '—');
-    set('l_2', okState(v('style_label')) ? v('style_label') : '—');
+    // signal chain: Source → (what the Lumagen does, on the arrow) → Display, then the Lumagen's settings
+    const lbl = okState(v('input_label')) ? v('input_label') : okState(v('logical_input')) ? `Input ${v('logical_input')}` : '';
+    set('s_h', lbl ? `Source · ${lbl}` : 'Source');
+    const srcVideo = fmtVideo(v('src_res'), v('src_mode'), v('src_rate'));
+    set('s_t', srcVideo);
+    const nits = v('src_dr') === 'HDR' && okState(v('hdr_max')) ? ` · ${Math.round(Number(v('hdr_max')))} nits` : '';
+    const srcAr = parseAspect(v('src_content'));
+    set('s_1', [okState(v('src_dr')) ? v('src_dr') + nits : '', srcAr ? srcAr.toFixed(2) : ''].filter(Boolean).join(' · '));
+    const proc = srcVideo === '—' ? [] : lumagenProcessing({ srcRes: v('src_res'), outRes: v('out_res'), srcDr: v('src_dr'), outCs: v('out_cs'),
+      srcAspect: v('src_content'), outAspect: v('out_aspect'), nls: v('nls') });
+    html(K.proc, proc.map((x) => `<div>${esc(x)}</div>`).join(''));
+    if (K.proc.title !== proc.join(' · ')) K.proc.title = proc.join(' · ');
     set('d_t', fmtVideo(v('out_res'), v('out_mode'), v('out_rate')));
-    set('d_1', okState(v('out_cs')) ? v('out_cs') : '—');
-    set('d_2', okState(v('out_aspect')) ? v('out_aspect') : '—');
+    const outAr = parseAspect(v('out_aspect'));
+    set('d_1', [okState(v('out_cs')) ? v('out_cs') : '', outAr ? outAr.toFixed(2) : ''].filter(Boolean).join(' · '));
+    const mem = okState(v('memory')) ? String(v('memory')).slice(-1) : '—';
+    set('l_t', [mem !== '—' ? `MEM ${mem}` : '', v('cms_label'), v('style_label')].filter(okState).join(' · '));
+    const strip = this.querySelector('[data-item="box-lmg"]');
+    if (strip) strip.hidden = !K.l_t.textContent;
 
-    // tags
+    // tags — each can be hidden (hidden_items: chain.tag_<id>)
     const tags = [];
-    if (isDown) tags.push(['LINK DOWN', 'bad']);
-    if (isHdr) tags.push(['HDR', 'hdr']);
-    if (isGame) tags.push(['GAME', 'game']);
-    if (live && v('nls') === 'True') tags.push(['NLS', 'ctx']);
-    if (live && v('auto_aspect') === 'on') tags.push(['AUTO AR', '']);
-    if (live && okState(v('src_3d')) && v('src_3d') !== 'Off') tags.push([`3D ${v('src_3d')}`, '']);
-    if (live && v('video_status') === 'No Source') tags.push(['NO SOURCE', 'bad']);
-    if (live && v('video_status') === 'Test Pattern') tags.push(['TEST PATTERN', '']);
-    html(K.tags, tags.map(([t, cls]) => `<span class="lmg-tag ${cls}">${esc(t)}</span>`).join(''));
+    if (isDown) tags.push(['link', 'LINK DOWN', 'bad']);
+    if (isHdr) tags.push(['hdr', 'HDR', 'hdr']);
+    if (isGame) tags.push(['game', 'GAME', 'game']);
+    if (live && v('nls') === 'True') tags.push(['nls', 'NLS', 'ctx']);
+    if (live && v('auto_aspect') === 'on') tags.push(['auto', 'AUTO AR', '']);
+    if (live && okState(v('src_3d')) && v('src_3d') !== 'Off') tags.push(['3d', `3D ${v('src_3d')}`, '']);
+    if (live && v('video_status') === 'No Source') tags.push(['nosource', 'NO SOURCE', 'bad']);
+    if (live && v('video_status') === 'Test Pattern') tags.push(['test', 'TEST PATTERN', '']);
+    const hiddenTags = new Set((c.hidden_items || []).filter((x) => x.startsWith('chain.tag_')).map((x) => x.slice('chain.tag_'.length)));
+    html(K.tags, tags.filter(([id]) => !hiddenTags.has(id)).map(([id, t, cls]) => `<span class="lmg-tag ${cls}" data-tag="${id}">${esc(t)}</span>`).join(''));
 
     // visualizer
     this._drawViz(v);
@@ -1865,7 +1915,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode,
+  WHEN_OFF, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, STATUS_TAGS,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);
