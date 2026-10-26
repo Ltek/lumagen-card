@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.10.26.19
+
+- **Wide pictures can be zoomed to fill the screen.** New *Pictures wider than the screen* (Screen & visualizer → Visualizer; `wide_fill`): *Letterboxed* (default, black bars top & bottom) or *Zoomed to fill* — the picture is enlarged until it fills the height and the left & right sides are cropped, e.g. a 2.40 film on a 2.00 screen loses 8.3 % on each side. The source picture outlines the part that stays on screen and the caption says *zoomed · left/right cropped*. Pick what your Lumagen is set up to do; its zoom can't be read over RS-232.
+- **NLS stretches only horizontally**, like the Lumagen: a 16:9 picture on a wider screen fills it with no top/bottom crop. The *NLS vertical stretch* default is now 0 % and the slider is gone from the editor; it only reappears if a value was set in an earlier version, so you can set it back to 0.
+
 ## v2026.10.26.18
 
 - **The card shrinks on small screens.** Below 420 px wide, every size scales down step by step: text, chips and buttons, the remote keys, icons, the visualizer, and row labels (92 % → 85 % → 78 % → 75 % at 240 px). Before, only the text that already wrapped got smaller; buttons and the remote kept their desktop size and pushed the layout around.

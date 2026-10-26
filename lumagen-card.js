@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.26.18
+// Version: v2026.10.26.19
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.26.18';
+const BUILD_NUMBER = 'v2026.10.26.19';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -119,7 +119,8 @@ const DEFAULTS = {
   start_collapsed: false,
   display_name: 'Display',
   display_aspect: 1.78,
-  nls_vertical: 5, // NLS vertical stretch in percent (the Lumagen's NLS menu); crops top / bottom
+  nls_vertical: 0, // legacy: NLS vertical stretch in percent (YAML only; the Lumagen's NLS is horizontal)
+  wide_fill: 'letterbox', // a picture wider than the output area: 'letterbox' (bars top/bottom) | 'zoom' (fill, crop the sides)
   viz_after_only: false,
   scene_image: '',
   show_chain: true,
@@ -320,6 +321,7 @@ function normalizeSectionEdits(c, out) {
 
 // What the card does while the device is in standby / off.
 const WHEN_OFF = [['hide', 'Hide the entire card'], ['collapse', 'Collapse to the header'], ['expanded', 'Keep expanded']];
+const WIDE_FILL = [['letterbox', 'Letterboxed (black bars top & bottom)'], ['zoom', 'Zoomed to fill (left & right cropped)']];
 const STACK_MODES = [['auto', 'Only on a very narrow card'], ['always', 'Always'], ['never', 'Never (always side by side)']];
 const STANDBY_TEXT = [['below', 'Below the title'], ['inline', 'Inline with the title'], ['hidden', 'Hidden']];
 
@@ -382,6 +384,7 @@ function normalizeConfig(raw) {
     if (list.length) out[k] = list;
   });
   if (out.when_off !== undefined && !WHEN_OFF.some(([v]) => v === out.when_off)) delete out.when_off;
+  if (out.wide_fill !== undefined && !WIDE_FILL.some(([v]) => v === out.wide_fill)) delete out.wide_fill;
   if (out.stack_when_narrow !== undefined && !STACK_MODES.some(([v]) => v === out.stack_when_narrow)) delete out.stack_when_narrow;
   normalizeSectionEdits(c, out);
   Object.keys(c).forEach((k) => {
@@ -465,9 +468,12 @@ function fitRect(x, y, w, h, ar) {
  * at this size the curve isn't visible). `nlsVertical` is that vertical stretch in percent
  * (the Lumagen's NLS vertical-stretch setting), capped so it never crops more than the
  * widening needs. `vstretch` is the factor used (1 = none).
- * Zoom is not modelled: it can't be read over RS-232.
+ * Wide pictures (wider than the output area, e.g. 2.40 on a 2.00 screen): `wideFill` 'letterbox'
+ * fits them (bars top and bottom); 'zoom' enlarges them until they fill the height and crops the
+ * left and right sides — set to match how your Lumagen is configured (zoom can't be read over RS-232).
+ * `hcrop` is the share of the width cut off (0 = none).
  */
-function vizGeometry({ raster, content, selected, output, screen, nls = false, nlsVertical = 0 }) {
+function vizGeometry({ raster, content, selected, output, screen, nls = false, nlsVertical = 0, wideFill = 'letterbox' }) {
   const W = 100 * raster;
   const scrW = 100 * screen;
   const area = fitRect(0, 0, scrW, 100, output);
@@ -476,8 +482,16 @@ function vizGeometry({ raster, content, selected, output, screen, nls = false, n
   const vstretch = stretching ? Math.min(1 + Math.max(0, nlsVertical) / 100, output / selected) : 1;
   // the vertical stretch pushes the top and bottom of the selected region off the screen
   const vh = sel.h / vstretch;
-  const visible = { x: sel.x, y: sel.y + (sel.h - vh) / 2, w: sel.w, h: vh };
-  const picture = stretching ? { ...area } : fitRect(area.x, area.y, area.w, area.h, selected);
+  let visible = { x: sel.x, y: sel.y + (sel.h - vh) / 2, w: sel.w, h: vh };
+  let picture = stretching ? { ...area } : fitRect(area.x, area.y, area.w, area.h, selected);
+  let hcrop = 0;
+  if (wideFill === 'zoom' && selected > output + 0.005) {
+    // fill the output area's height; the sides that end up off the area are cut off
+    const keep = output / selected;
+    hcrop = 1 - keep;
+    visible = { x: sel.x + (sel.w * hcrop) / 2, y: sel.y, w: sel.w * keep, h: sel.h };
+    picture = { ...area };
+  }
   return {
     source: { w: W, h: 100 },
     content: fitRect(0, 0, W, 100, content),
@@ -487,6 +501,7 @@ function vizGeometry({ raster, content, selected, output, screen, nls = false, n
     area,
     picture,
     vstretch,
+    hcrop,
     hstretch: stretching ? output / (selected * vstretch) : 1,
     image: picture, // kept for older callers
   };
@@ -500,6 +515,7 @@ function vizResult({ content, selected, output, screen, nls }, g) {
   const out = [];
   const nlsCrop = nlsCropPct(g);
   if (selected > content + 0.01 || nlsCrop > 0.05) out.push('top/bottom cropped');
+  if (g.hcrop > 0.0005) out.push('zoomed · left/right cropped');
   else if (selected < content - 0.01) out.push('film bars kept');
   const p = g.picture;
   const bars = [];
@@ -1328,7 +1344,8 @@ class LumagenCard extends HTMLElement {
     const output = parseAspect(v('out_aspect')) || screen;
     const nls = v('nls') === 'True';
     const nlsVertical = Math.min(25, Math.max(0, Number(cfg(this._config, 'nls_vertical')) || 0));
-    const g = vizGeometry({ raster, content, selected, output, screen, nls, nlsVertical });
+    const wideFill = cfg(this._config, 'wide_fill');
+    const g = vizGeometry({ raster, content, selected, output, screen, nls, nlsVertical, wideFill });
     const crop = nlsCropPct(g);
     const V = this._v;
     const attrs = (el, o) => Object.entries(o).forEach(([k, val]) => {
@@ -1344,7 +1361,7 @@ class LumagenCard extends HTMLElement {
     attrs(V['src-img'], rect(g.content));
     // the outline is what reaches the screen: the Lumagen's region, less the NLS top / bottom crop
     attrs(V['src-sel'], rect(g.visible));
-    V['src-sel'].style.display = Math.abs(selected - content) > 0.01 || crop > 0.05 ? '' : 'none';
+    V['src-sel'].style.display = Math.abs(selected - content) > 0.01 || crop > 0.05 || g.hcrop > 0.0005 ? '' : 'none';
     // after: the screen; the Lumagen's output area is black, and the selected region is
     // scaled into it (uniform fit; NLS fills the width). The nested svg's viewBox clips
     // anything outside the selected region — that is the top/bottom crop.
@@ -1357,7 +1374,8 @@ class LumagenCard extends HTMLElement {
     attrs(V['out-img'], rect(g.content));
     const before = `Content <b>${f2(content)}</b>${Math.abs(content - raster) > 0.01 ? ` in ${f2(raster)} frame` : ''}`
       + (Math.abs(selected - content) > 0.01 ? `<br>Lumagen set to ${f2(selected)}` : '')
-      + (crop > 0.05 ? `<br>NLS crops ${f1(crop / 2)}% top &amp; bottom` : '');
+      + (crop > 0.05 ? `<br>NLS crops ${f1(crop / 2)}% top &amp; bottom` : '')
+      + (g.hcrop > 0.0005 ? `<br>Zoom crops ${f1((g.hcrop * 100) / 2)}% left &amp; right` : '');
     const after = `Content <b>${f2(selected)}</b> · Output <b>${f2(output)}</b><br>on ${f2(screen)} screen · ${vizResult({ content, selected, output, screen, nls }, g)}`;
     if (this._k.cap_before.innerHTML !== before) this._k.cap_before.innerHTML = before;
     if (this._k.cap_after.innerHTML !== after) this._k.cap_after.innerHTML = after;
@@ -1797,8 +1815,11 @@ class LumagenCardEditor extends HTMLElement {
       ${this._slider('display_aspect', 'Aspect', aspect, 1.33, 2.76, 0.01, '', (n) => Number(n).toFixed(2))}
       <div class="lmge-presets">${ASPECT_PRESETS.map((p) => `<button class="lmge-preset${Math.abs(p - aspect) < 0.005 ? ' on' : ''}" data-preset="${p}">${p.toFixed(2)}</button>`).join('')}</div>
       <div class="lmge-group">Visualizer</div>
-      ${this._slider('nls_vertical', 'NLS vertical stretch', Math.min(25, Math.max(0, Number(cfg(c, 'nls_vertical')))), 0, 25, 1, '', (n) => `${n}%`)}
-      <p class="lmge-hint">With NLS on (a 16:9 picture on a wider screen), part of the widening is a small vertical stretch that crops the top and bottom. Set this to the vertical stretch in your Lumagen's NLS settings so the visualizer crops the same.</p>
+      <div class="lmge-row"><label class="lbl">Pictures wider than the screen</label>
+        <select data-key="wide_fill">${WIDE_FILL.map(([v, n]) => `<option value="${v}"${v === cfg(c, 'wide_fill') ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <p class="lmge-hint">E.g. a 2.40 film on a 2.00 screen. Pick what your Lumagen is set up to do — the card can't read its zoom. Narrower pictures with NLS on are stretched sideways to fill the width.</p>
+      ${Number(cfg(c, 'nls_vertical')) > 0 ? `${this._slider('nls_vertical', 'NLS vertical stretch', Math.min(25, Math.max(0, Number(cfg(c, 'nls_vertical')))), 0, 25, 1, '', (n) => `${n}%`)}
+      <p class="lmge-hint">Set in an earlier version. The Lumagen's NLS stretches only horizontally — set this to 0% to match it (the slider then goes away).</p>` : ''}
       <label class="lmge-check"><input type="checkbox" data-key="viz_after_only"${cfg(c, 'viz_after_only') ? ' checked' : ''}>
         Only show the screen (result) and its description</label>
       <div class="lmge-row"><label class="lbl">Picture</label><input type="text" data-key="scene_image" value="${esc(cfg(c, 'scene_image'))}" placeholder="Built-in landscape — or a URL, e.g. /local/beach.jpg"></div>`;
@@ -1954,7 +1975,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, STACK_MODES, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
+  WHEN_OFF, WIDE_FILL, STACK_MODES, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);

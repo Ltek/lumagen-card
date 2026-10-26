@@ -42,7 +42,8 @@ pencil on each row for its name, settings and merge) · **Screen & visualizer** 
 |---|---|---|
 | `display_name` | `Display` | Heading of the Display box, e.g. your projector. |
 | `display_aspect` | `1.78` | Your screen's shape, e.g. `2.40` for a scope screen or `2.00`. |
-| `nls_vertical` | `5` | NLS vertical stretch in percent (0–25), as set in your Lumagen's NLS menu. With NLS on, the visualizer stretches the picture this much vertically (cropping the top and bottom) and the rest horizontally, never more vertically than the widening needs. `0` = a purely horizontal stretch. |
+| `wide_fill` | `letterbox` | A picture wider than the screen (e.g. 2.40 on a 2.00 screen): `letterbox` (black bars top & bottom) or `zoom` (enlarged to fill the height, left & right cropped). Match how your Lumagen is set up — its zoom can't be read. Editor: Screen & visualizer → Visualizer. |
+| `nls_vertical` | `0` | Legacy. The Lumagen's NLS stretches only horizontally, so leave it at 0; any other value adds a top/bottom crop to the visualizer's NLS picture. Not in the editor unless set. |
 | `viz_after_only` | `false` | Show only the screen (the result) and its caption. |
 | `scene_image` | built-in landscape | Picture for the visualizer, e.g. `/local/beach.jpg`. |
 
