@@ -1,5 +1,13 @@
 # Changelog
 
+## v2026.10.26.18
+
+- **The card shrinks on small screens.** Below 420 px wide, every size scales down step by step: text, chips and buttons, the remote keys, icons, the visualizer, and row labels (92 % → 85 % → 78 % → 75 % at 240 px). Before, only the text that already wrapped got smaller; buttons and the remote kept their desktop size and pushed the layout around.
+- Under 300 px the Admin buttons go to two per row and row labels (Input, Memory, CMS…) sit above their chips.
+- **Admin buttons no longer overlap:** a long label like *Restart outputs* wraps inside its button instead of running into the next one.
+- **Fixed: chip and remote-key text ignored the *Chips & buttons → Text size* setting** — a button style reset the font size to the card's. Chips now use 13 px (or your setting), which is a little smaller than before.
+- New `shrink_when_narrow` (Card → Size, on by default) turns the shrinking off.
+
 ## v2026.10.23.17
 
 - **The status boxes stay side by side on a phone.** They stacked whenever the status area was under 360 px, which is every phone in portrait. Now they stack only under 260 px (e.g. a small grid column).

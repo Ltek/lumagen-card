@@ -23,6 +23,7 @@ pencil on each row for its name, settings and merge) · **Screen & visualizer** 
 | `start_collapsed` | `false` | With `collapsible`, start collapsed. |
 | `show_dot` | `true` | Show the link dot (green: link OK, red: link down). |
 | `dot_position` | `title` | `title` (right of the title), `right` (far right) or `icon` (replaces the header icon; it is then the power button). |
+| `shrink_when_narrow` | `true` | Scale the whole card down on narrow screens (below 420 px: text, buttons, remote, icons, visualizer), so nothing overflows on a phone or a narrow grid column. Editor: Card → Size. |
 | `stack_when_narrow` | `auto` | Put the status boxes one above the other: `auto` only when the status area is narrower than 260 px (a phone in portrait stays side by side; a small grid column stacks), `always`, or `never`. Editor: Sections → pencil on **The signal chain** → Options. |
 
 ## Power & standby

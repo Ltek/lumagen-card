@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.23.17
+// Version: v2026.10.26.18
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.23.17';
+const BUILD_NUMBER = 'v2026.10.26.18';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -132,6 +132,7 @@ const DEFAULTS = {
   show_memory: true,
   show_picture: true,
   show_admin: true,
+  shrink_when_narrow: true,
   stack_when_narrow: 'auto', // status boxes on a narrow card: auto (stack under 260 px) | always | never
   accent_color: '',
   hdr_color: '',
@@ -421,6 +422,7 @@ function rootStyleVars(config) {
 function rootClasses(config) {
   const st = config.styles || {};
   const cls = ['lmg', `stack-${cfg(config, 'stack_when_narrow')}`];
+  if (cfg(config, 'shrink_when_narrow')) cls.push('shrink');
   if (st.card_border_color) cls.push('has-border');
   if (st.card_background === 'transparent') cls.push('is-flat');
   return cls.join(' ');
@@ -604,51 +606,51 @@ const CARD_CSS = `
 .lmg.is-game { --lmg-ctx: var(--lmg-game, #4caf50); }
 .lmg [hidden] { display: none !important; }
 /* Buttons with a hold: no text selection or callout on a long-press (iOS / Android). */
-.lmg button { font: inherit; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.lmg button { font-family: inherit; font-weight: inherit; /* not "font: inherit" - that also reset font-size and beat .lmg-chip, so chip_size was ignored */ -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .lmg-head { display: flex; align-items: center; gap: 10px; min-height: 36px; }
-.lmg-power { flex: 0 0 auto; width: calc(var(--lmg-header-icon-size, 22px) + 14px); height: calc(var(--lmg-header-icon-size, 22px) + 14px);
+.lmg-power { flex: 0 0 auto; width: calc(calc(var(--lmg-header-icon-size, 22px) * var(--lmg-k, 1)) + 14px); height: calc(calc(var(--lmg-header-icon-size, 22px) * var(--lmg-k, 1)) + 14px);
   border-radius: 50%; border: none; cursor: pointer; background: transparent; color: var(--disabled-text-color, #777);
   display: flex; align-items: center; justify-content: center; transition: background .2s, color .2s;
-  --mdc-icon-size: var(--lmg-header-icon-size, 22px); }
+  --mdc-icon-size: calc(var(--lmg-header-icon-size, 22px) * var(--lmg-k, 1)); }
 .lmg.is-on .lmg-power { color: var(--lmg-header-icon-color, var(--lmg-ctx)); background: color-mix(in srgb, var(--lmg-header-icon-color, var(--lmg-ctx)) 16%, transparent); }
-.lmg-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--lmg-title-size, 16px); font-weight: 500; white-space: nowrap;
+.lmg-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: calc(var(--lmg-title-size, 16px) * var(--lmg-k, 1)); font-weight: 500; white-space: nowrap;
   color: var(--lmg-title-color, var(--primary-text-color)); }
 .lmg-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--disabled-text-color, #777); }
 .lmg-dot.at-right { margin-left: 2px; }
-.lmg-dot.at-icon { width: calc(var(--lmg-header-icon-size, 22px) * .6); height: calc(var(--lmg-header-icon-size, 22px) * .6); }
+.lmg-dot.at-icon { width: calc(calc(var(--lmg-header-icon-size, 22px) * var(--lmg-k, 1)) * .6); height: calc(calc(var(--lmg-header-icon-size, 22px) * var(--lmg-k, 1)) * .6); }
 .lmg-dot.ok { background: var(--success-color, #4caf50); }
 .lmg-dot.bad { background: var(--error-color, #f44336); }
-.lmg-summary { margin-left: auto; min-width: 0; font-size: var(--lmg-summary-size, 13px); color: var(--lmg-summary-color, var(--secondary-text-color));
+.lmg-summary { margin-left: auto; min-width: 0; font-size: calc(var(--lmg-summary-size, 13px) * var(--lmg-k, 1)); color: var(--lmg-summary-color, var(--secondary-text-color));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lmg.is-down .lmg-summary { color: var(--error-color, #f44336); }
 .lmg-head.is-tap { cursor: pointer; }
-.lmg-hchev { color: var(--secondary-text-color); --mdc-icon-size: 20px; transition: transform .2s; flex: 0 0 auto; }
+.lmg-hchev { color: var(--secondary-text-color); --mdc-icon-size: calc(20px * var(--lmg-k, 1)); transition: transform .2s; flex: 0 0 auto; }
 .lmg.is-collapsed .lmg-hchev { transform: rotate(-90deg); }
 .lmg.is-collapsed .lmg-body { display: none; }
-.lmg-sb-inline { margin-left: max(0px, calc(var(--lmg-standby-indent, 46px) - 46px)); font-size: var(--lmg-secondary-size, 12px); font-weight: 400; color: var(--lmg-secondary-color, var(--secondary-text-color));
+.lmg-sb-inline { margin-left: max(0px, calc(var(--lmg-standby-indent, 46px) - 46px)); font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); font-weight: 400; color: var(--lmg-secondary-color, var(--secondary-text-color));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lmg-pwr2 { margin-left: auto; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
   background: var(--lmg-box); color: var(--lmg-header-icon-color, var(--lmg-ctx)); display: flex; align-items: center; justify-content: center;
-  --mdc-icon-size: 20px; }
+  --mdc-icon-size: calc(20px * var(--lmg-k, 1)); }
 .lmg-pwr2:hover { background: color-mix(in srgb, var(--lmg-ctx) 20%, transparent); }
-.lmg-standby { padding: 2px 0 2px var(--lmg-standby-indent, 46px); font-size: var(--lmg-secondary-size, 13px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-standby { padding: 2px 0 2px var(--lmg-standby-indent, 46px); font-size: calc(var(--lmg-secondary-size, 13px) * var(--lmg-k, 1)); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-chain { display: flex; gap: 6px; margin-top: 10px; }
 .lmg-chain > .lmg-box { flex: 1 1 0; }
 .lmg-uhide, .lmg-away { display: none !important; }
 .lmg-merged { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--lmg-divider-color, rgba(127,127,127,0.2)); }
-.lmg-merged-h { margin-bottom: 4px; font-size: var(--lmg-subtitle-size, 10px); letter-spacing: .08em; text-transform: uppercase;
+.lmg-merged-h { margin-bottom: 4px; font-size: calc(var(--lmg-subtitle-size, 10px) * var(--lmg-k, 1)); letter-spacing: .08em; text-transform: uppercase;
   color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
 .lmg-box { min-width: 0; padding: 8px 6px; border-radius: 10px; text-align: center; background: var(--lmg-box); }
-.lmg-box-h { font-size: var(--lmg-subtitle-size, 10px); letter-spacing: .08em; text-transform: uppercase; color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
+.lmg-box-h { font-size: calc(var(--lmg-subtitle-size, 10px) * var(--lmg-k, 1)); letter-spacing: .08em; text-transform: uppercase; color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
 .lmg-box-h { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lmg-box-t { font-size: var(--lmg-text-size, 14px); font-weight: 600; color: var(--lmg-text-color, var(--primary-text-color)); line-height: 1.25;
+.lmg-box-t { font-size: calc(var(--lmg-text-size, 14px) * var(--lmg-k, 1)); font-weight: 600; color: var(--lmg-text-color, var(--primary-text-color)); line-height: 1.25;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
-.lmg-box-s { font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); line-height: 1.3;
+.lmg-box-s { font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); color: var(--lmg-secondary-color, var(--secondary-text-color)); line-height: 1.3;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .lmg-box-s:empty { display: none; }
 .lmg-link { flex: 0 0 auto; max-width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0 2px; }
-.lmg-link-l { text-align: center; line-height: 1.2; font-size: var(--lmg-subtitle-size, 10px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
-.lmg-link-l > div:first-child { font-size: var(--lmg-secondary-size, 12px); font-weight: 600; color: var(--lmg-ctx); }
+.lmg-link-l { text-align: center; line-height: 1.2; font-size: calc(var(--lmg-subtitle-size, 10px) * var(--lmg-k, 1)); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-link-l > div:first-child { font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); font-weight: 600; color: var(--lmg-ctx); }
 .lmg-link-l:empty { display: none; }
 .lmg-ar { color: var(--lmg-ctx); font-weight: 600; }
 .lmg-status { container-type: inline-size; }
@@ -663,11 +665,11 @@ const CARD_CSS = `
 .lmg.stack-always .lmg-status .lmg-chain { flex-direction: column; }
 .lmg.stack-always .lmg-status .lmg-link { max-width: none; flex-direction: row-reverse; gap: 6px; }
 .lmg.stack-always .lmg-status .lmg-arrow { transform: rotate(90deg); }
-.lmg-arrow { align-self: center; color: var(--lmg-icon-color, var(--lmg-ctx)); --mdc-icon-size: 18px; }
+.lmg-arrow { align-self: center; color: var(--lmg-icon-color, var(--lmg-ctx)); --mdc-icon-size: calc(18px * var(--lmg-k, 1)); }
 .lmg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .lmg-tagset { display: contents; }
 .lmg-tag.set { color: var(--lmg-secondary-color, var(--secondary-text-color)); text-transform: none; letter-spacing: 0; font-weight: 500; }
-.lmg-tag { padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 11px; font-weight: 600;
+.lmg-tag { padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: calc(11px * var(--lmg-k, 1)); font-weight: 600;
   letter-spacing: .04em; color: var(--secondary-text-color); }
 .lmg-tag.hdr { color: var(--lmg-hdr, #ffb300); }
 .lmg-tag.game { color: var(--lmg-game, #4caf50); }
@@ -675,36 +677,36 @@ const CARD_CSS = `
 .lmg-tag.bad { color: var(--error-color, #f44336); }
 .lmg-viz { display: flex; align-items: flex-start; justify-content: center; gap: 12px; margin-top: 12px; }
 .lmg-scr { display: flex; flex-direction: column; align-items: center; min-width: 0; }
-.lmg-scr > svg { display: block; height: var(--lmg-viz-height, 72px); width: auto; max-width: 100%; overflow: visible; }
-.lmg-viz-arrow { align-self: flex-start; margin-top: calc(var(--lmg-viz-height, 72px) / 2 - 9px); color: var(--lmg-icon-color, var(--secondary-text-color)); --mdc-icon-size: 18px; }
+.lmg-scr > svg { display: block; height: calc(var(--lmg-viz-height, 72px) * var(--lmg-k, 1)); width: auto; max-width: 100%; overflow: visible; }
+.lmg-viz-arrow { align-self: flex-start; margin-top: calc(calc(var(--lmg-viz-height, 72px) * var(--lmg-k, 1)) / 2 - 9px); color: var(--lmg-icon-color, var(--secondary-text-color)); --mdc-icon-size: calc(18px * var(--lmg-k, 1)); }
 /* A caption never widens its column (width 0, then stretched to the picture's width): it wraps under
    the picture, so both pictures and the arrow stay centered in the row. */
-.lmg-cap { width: 0; min-width: 100%; margin-top: 4px; text-align: center; font-size: var(--lmg-caption-size, 11px); line-height: 1.35;
+.lmg-cap { width: 0; min-width: 100%; margin-top: 4px; text-align: center; font-size: calc(var(--lmg-caption-size, 11px) * var(--lmg-k, 1)); line-height: 1.35;
   color: var(--lmg-caption-color, var(--secondary-text-color)); }
 .lmg-cap b { color: var(--lmg-text-color, var(--primary-text-color)); font-weight: 600; }
 .lmg-frame { fill: #000; }
 .lmg-edge { fill: none; stroke: var(--lmg-viz-border-color, rgba(127,127,127,0.6)); stroke-width: var(--lmg-viz-border-width, 2px); vector-effect: non-scaling-stroke; }
 .lmg-sel { fill: none; stroke: var(--lmg-ctx); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 .lmg-wall { fill: rgba(127,127,127,0.18); }
-.lmg-hdrp { margin-top: 8px; font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-hdrp { margin-top: 8px; font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-hdrp b { color: var(--lmg-text-color, var(--primary-text-color)); }
 .lmg-bar { position: relative; height: 6px; margin-top: 4px; border-radius: 3px; background: rgba(127,127,127,0.2); overflow: hidden; }
 .lmg-bar > span { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--lmg-hdr, #ffb300); transition: width .4s ease; }
 .lmg-fold { margin-top: 10px; border-top: 1px solid var(--lmg-divider-color, rgba(127,127,127,0.2)); }
 .lmg-fold > summary { display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; cursor: pointer; list-style: none;
-  font-size: var(--lmg-section-title-size, 14px); color: var(--lmg-section-title-color, var(--primary-text-color)); user-select: none; }
+  font-size: calc(var(--lmg-section-title-size, 14px) * var(--lmg-k, 1)); color: var(--lmg-section-title-color, var(--primary-text-color)); user-select: none; }
 .lmg-fold > summary::-webkit-details-marker { display: none; }
-.lmg-fold > summary .lmg-sec-i { color: var(--lmg-section-icon-color, var(--lmg-ctx)); --mdc-icon-size: var(--lmg-section-icon-size, 18px); }
-.lmg-fold > summary .lmg-chev { margin-left: auto; color: var(--secondary-text-color); --mdc-icon-size: 18px; transition: transform .2s; }
+.lmg-fold > summary .lmg-sec-i { color: var(--lmg-section-icon-color, var(--lmg-ctx)); --mdc-icon-size: calc(var(--lmg-section-icon-size, 18px) * var(--lmg-k, 1)); }
+.lmg-fold > summary .lmg-chev { margin-left: auto; color: var(--secondary-text-color); --mdc-icon-size: calc(18px * var(--lmg-k, 1)); transition: transform .2s; }
 .lmg-fold[open] > summary .lmg-chev { transform: rotate(90deg); }
-.lmg-fold > summary .lmg-peek { font-size: var(--lmg-secondary-size, 12px); color: var(--lmg-secondary-color, var(--secondary-text-color));
+.lmg-fold > summary .lmg-peek { font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); color: var(--lmg-secondary-color, var(--secondary-text-color));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lmg-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; }
-.lmg-row-l { flex: 0 0 56px; padding-top: 6px; font-size: var(--lmg-subtitle-size, 12px); color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
+.lmg-row-l { flex: 0 0 calc(56px * var(--lmg-k, 1)); padding-top: 6px; font-size: calc(var(--lmg-subtitle-size, 12px) * var(--lmg-k, 1)); color: var(--lmg-subtitle-color, var(--secondary-text-color)); }
 .lmg-opts { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.lmg-chip { padding: 5px 10px; border: 1px solid var(--lmg-chip-border-color, rgba(127,127,127,0.35)); border-radius: 8px; cursor: pointer;
+.lmg-chip { padding: calc(5px * var(--lmg-k, 1)) calc(10px * var(--lmg-k, 1)); border: 1px solid var(--lmg-chip-border-color, rgba(127,127,127,0.35)); border-radius: 8px; cursor: pointer;
   background: var(--lmg-chip-background, transparent); color: var(--lmg-chip-color, var(--primary-text-color));
-  font-size: var(--lmg-chip-size, 13px); white-space: nowrap; transition: background .2s, border-color .2s; }
+  font-size: calc(var(--lmg-chip-size, 13px) * var(--lmg-k, 1)); white-space: nowrap; transition: background .2s, border-color .2s; }
 .lmg-chip:hover { border-color: var(--lmg-ctx); }
 .lmg-chip.on { background: var(--lmg-ctx); border-color: var(--lmg-ctx); color: #fff; }
 .lmg-chip.act { border-style: dashed; color: var(--lmg-ctx); }
@@ -712,18 +714,31 @@ const CARD_CSS = `
 .lmg-held { outline: 2px solid var(--lmg-ctx); outline-offset: 1px; }
 .lmg.is-off .lmg-ctl, .lmg.is-down .lmg-ctl { opacity: .45; pointer-events: none; }
 .lmg.is-down [data-sec="chain"] .lmg-chain, .lmg.is-down [data-sec="visualizer"], .lmg.is-down [data-sec="hdr"] { opacity: .45; }
-.lmg-pad { display: grid; grid-template-columns: repeat(3, 64px); grid-auto-rows: 44px; gap: 6px; justify-content: center; margin-top: 6px; }
+.lmg-pad { display: grid; grid-template-columns: repeat(3, calc(64px * var(--lmg-k, 1))); grid-auto-rows: calc(44px * var(--lmg-k, 1)); gap: 6px; justify-content: center; margin-top: 6px; }
 .lmg-key { display: flex; align-items: center; justify-content: center; border: none; border-radius: 10px; cursor: pointer;
-  background: var(--lmg-box); color: var(--lmg-icon-color, var(--primary-text-color)); font-size: var(--lmg-chip-size, 12px);
-  --mdc-icon-size: var(--lmg-icon-size, 22px); }
+  background: var(--lmg-box); color: var(--lmg-icon-color, var(--primary-text-color)); font-size: calc(var(--lmg-chip-size, 12px) * var(--lmg-k, 1));
+  --mdc-icon-size: calc(var(--lmg-icon-size, 22px) * var(--lmg-k, 1)); }
 .lmg-key:hover { background: color-mix(in srgb, var(--lmg-ctx) 20%, transparent); }
 .lmg-key.ok { background: color-mix(in srgb, var(--lmg-ctx) 30%, transparent); color: var(--lmg-ctx); }
 .lmg-key.sm { color: var(--lmg-chip-color, var(--secondary-text-color)); }
 .lmg-admin { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin-top: 6px; }
-.lmg-admin .lmg-chip { text-align: center; }
-.lmg-note { margin-top: 8px; font-size: var(--lmg-secondary-size, 12px); line-height: 1.5; color: var(--lmg-secondary-color, var(--secondary-text-color)); }
+.lmg-admin .lmg-chip { text-align: center; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; padding-inline: calc(4px * var(--lmg-k, 1)); }
+.lmg-note { margin-top: 8px; font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); line-height: 1.5; color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-note.bad { color: var(--error-color, #f44336); }
-.lmg-hint { margin-top: 4px; font-size: 11px; color: var(--secondary-text-color); text-align: center; }
+.lmg-hint { margin-top: 4px; font-size: calc(11px * var(--lmg-k, 1)); color: var(--secondary-text-color); text-align: center; }
+/* Narrow cards (shrink_when_narrow): the whole card scales down, so nothing overflows on a phone or a
+   narrow grid column. --lmg-k multiplies every size above; it is set on the card's children because a
+   container query styles the container's descendants, not the container itself. */
+.lmg { container: lmgcard / inline-size; }
+@container lmgcard (max-width: 420px) { .lmg.shrink > * { --lmg-k: .92; } }
+@container lmgcard (max-width: 360px) { .lmg.shrink > * { --lmg-k: .85; } .lmg.shrink .lmg-viz { gap: 6px; } }
+@container lmgcard (max-width: 300px) {
+  .lmg.shrink > * { --lmg-k: .78; }
+  .lmg.shrink .lmg-admin { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lmg.shrink .lmg-row { flex-direction: column; gap: 4px; }
+  .lmg.shrink .lmg-row-l { flex: none; padding-top: 0; }
+}
+@container lmgcard (max-width: 240px) { .lmg.shrink > * { --lmg-k: .75; } }
 `;
 
 // ---------------------------------------------------------------------------
@@ -1762,6 +1777,10 @@ class LumagenCardEditor extends HTMLElement {
       <p class="lmge-hint">Green when the Lumagen answers, red when the link is down.</p>
       <div class="lmge-row"><label class="lmge-check"><input type="checkbox" data-key="show_dot"${cfg(c, 'show_dot') ? ' checked' : ''}>Show</label>
         ${cfg(c, 'show_dot') ? `<select data-key="dot_position">${DOT_POSITIONS.map(([v, n]) => `<option value="${v}"${v === cfg(c, 'dot_position') ? ' selected' : ''}>${n}</option>`).join('')}</select>` : ''}</div>
+      <div class="lmge-group">Size</div>
+      <label class="lmge-check"><input type="checkbox" data-key="shrink_when_narrow"${cfg(c, 'shrink_when_narrow') ? ' checked' : ''}>
+        Shrink the card on narrow screens (phones, narrow grid columns)</label>
+      <p class="lmge-hint">Text, buttons, the remote and the visualizer scale down step by step below 420 px, so nothing overflows.</p>
       <div class="lmge-group">Collapse</div>
       <label class="lmge-check"><input type="checkbox" data-key="collapsible"${cfg(c, 'collapsible') ? ' checked' : ''}>
         Tap the header to collapse the card to just the header (while the Lumagen is on)</label>
