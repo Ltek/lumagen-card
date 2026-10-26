@@ -60,8 +60,9 @@ HACS → **⋮ → Custom repositories** → `https://github.com/Ltek/lumagen-ca
 - **Left:** the incoming frame, with the picture where it really is, letterbox bars and all.
 - **Right:** your screen, with the picture scaled into it **the way the Lumagen does**: letterboxed or
   pillarboxed when the shapes differ, never distorted.
-- **NLS** is drawn like the real thing: mostly a horizontal stretch, plus a slight vertical stretch that
-  crops the top and bottom. The card shows how much is cropped, matched to your Lumagen's NLS setting.
+- **NLS** is drawn like the real thing: a horizontal stretch that fills the screen's width, nothing cropped.
+- **Wide films** (e.g. 2.40 on a 2.00 screen) are letterboxed, or — if your Lumagen zooms them — enlarged
+  to fill the screen with the left and right sides cropped (*Pictures wider than the screen*).
 - A wrong aspect setting shows the real crop or bars, with a caption saying what you see.
 - Use the built-in landscape or your own picture; or show only the screen.
 
