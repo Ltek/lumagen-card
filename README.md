@@ -4,11 +4,11 @@ A Home Assistant Dashboard card for the **Lumagen Radiance Pro**. See what comes
 does with it and what reaches your screen, watch a live picture of how your aspect settings crop and
 scale it, and reach every everyday control from one card, set up in a visual editor.
 
-Current build: **v2026.10.26.19** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
+Current build: **v2026.10.29.20** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
 
 ```
  ▣  Lumagen ●                                Apple TV · HDR · 2.40
- ┌ SOURCE · APPLE TV ────┐            ┌ JVC ──────────────────┐
+ ┌ APPLE TV ─────────────┐            ┌ JVC ──────────────────┐
  │ 2160p24               │  Tone map  │ 2160p24               │
  │ HDR · 1000 nits       │  ───────►  │ SDR · BT.2020         │
  │ 2.40                  │            │ 2.40                  │
@@ -81,6 +81,7 @@ HACS → **⋮ → Custom repositories** → `https://github.com/Ltek/lumagen-ca
 
 ### Make it yours
 - **Reorder, rename, hide and merge sections**, and hide single settings or buttons you never use.
+- Size, weight and color for **each row of the status boxes**, set once for both boxes.
 - Your own icons, accent / HDR / game colors, and sizes and colors for every part of the card,
   including the visualizer, from your theme or your own.
 - Everything is in the visual editor; YAML is optional. Only settings you change are saved.

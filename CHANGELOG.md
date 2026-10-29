@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.10.29.20
+
+- **The status boxes drop the Source word: the Source box's top line names only the input (Apple TV). The Display box shows your `display_name`, which is now empty by default instead of "Display"; existing names stay.** The boxes' places already say which side is which.
+- **Size, weight and color for each row of the status boxes**, set once for both boxes: Appearance → **Signal chain rows**: Source / display name, Resolution & rate, Dynamic range, Aspect. YAML: `styles: flow_<name|row1|row2|row3>_<size|weight|color>`. A row left at its default follows Subtitles / Values / Details text as before, so nothing changes until you set one.
+
 ## v2026.10.26.19
 
 - **Wide pictures can be zoomed to fill the screen.** New *Pictures wider than the screen* (Screen & visualizer → Visualizer; `wide_fill`): *Letterboxed* (default, black bars top & bottom) or *Zoomed to fill* — the picture is enlarged until it fills the height and the left & right sides are cropped, e.g. a 2.40 film on a 2.00 screen loses 8.3 % on each side. The source picture outlines the part that stays on screen and the caption says *zoomed · left/right cropped*. Pick what your Lumagen is set up to do; its zoom can't be read over RS-232.

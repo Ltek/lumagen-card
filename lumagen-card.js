@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.26.19
+// Version: v2026.10.29.20
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.26.19';
+const BUILD_NUMBER = 'v2026.10.29.20';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -117,7 +117,7 @@ const DEFAULTS = {
   dot_position: 'title',
   collapsible: false,
   start_collapsed: false,
-  display_name: 'Display',
+  display_name: '', // the Display box's top line, e.g. your projector; empty = no name
   display_aspect: 1.78,
   nls_vertical: 0, // legacy: NLS vertical stretch in percent (YAML only; the Lumagen's NLS is horizontal)
   wide_fill: 'letterbox', // a picture wider than the output area: 'letterbox' (bars top/bottom) | 'zoom' (fill, crop the sides)
@@ -219,19 +219,45 @@ const STYLE_DEFS = [
   ['caption_color', 'viz', 'color', 'Caption color', 'Secondary text'],
   ['viz_border_width', 'viz', 'size', 'Screen border width', 2, 0, 8],
   ['viz_border_color', 'viz', 'color', 'Screen border color', 'Subtle grey'],
+  ['flow_name_size', 'flow', 'size', 'Size', 10, 7, 30, 'subtitle_size'],
+  ['flow_name_weight', 'flow', 'weight', 'Weight', '400'],
+  ['flow_name_color', 'flow', 'color', 'Color', 'Follows Subtitles color'],
+  ['flow_row1_size', 'flow', 'size', 'Size', 14, 7, 30, 'text_size'],
+  ['flow_row1_weight', 'flow', 'weight', 'Weight', '600'],
+  ['flow_row1_color', 'flow', 'color', 'Color', 'Follows Values color'],
+  ['flow_row2_size', 'flow', 'size', 'Size', 12, 7, 30, 'secondary_size'],
+  ['flow_row2_weight', 'flow', 'weight', 'Weight', '400'],
+  ['flow_row2_color', 'flow', 'color', 'Color', 'Follows Details color'],
+  ['flow_row3_size', 'flow', 'size', 'Size', 12, 7, 30, 'secondary_size'],
+  ['flow_row3_weight', 'flow', 'weight', 'Weight', '600'],
+  ['flow_row3_color', 'flow', 'color', 'Color', 'Accent color'],
 ];
 const STYLE_GROUPS = [
   ['card', 'Card', 'Background, border and the boxes / remote keys.'],
   ['header', 'Header', 'Icon, title and the live summary on the right.'],
   ['sections', 'Section headers', 'The collapsible Aspect / Remote / Source / Picture / Admin rows.'],
-  ['subtitles', 'Subtitles', 'Box headings (SOURCE / LUMAGEN / DISPLAY) and row labels (Input, Memory…).'],
+  ['subtitles', 'Subtitles', 'Box headings (the input and display names) and row labels (Input, Memory…).'],
   ['text', 'Values', 'Main values in the Source and Display boxes.'],
   ['secondary', 'Details text', 'Second lines, HDR details, link and notes.'],
+  ['flow', 'Signal chain rows', 'Each row of the Source and Display boxes, in both boxes at once. A setting left at its default follows Subtitles, Values or Details text (the aspect row: the accent color).'],
   ['chips', 'Chips & buttons', 'Input / aspect / CMS / admin buttons. Active chips use the context color.'],
   ['icons', 'Icons', 'Remote key icons and the signal-chain arrows.'],
   ['viz', 'Visualizer', 'Screen size, the border around each screen, and the caption under it.'],
 ];
 const STYLE_INDEX = Object.fromEntries(STYLE_DEFS.map((d) => [d[0], d]));
+// The status box rows (Appearance → Signal chain rows): [row id, editor label]. Each has a size, weight and color.
+const FLOW_ROWS = [['name', 'Source / display name (top line)'], ['row1', 'Resolution & rate'], ['row2', 'Dynamic range'], ['row3', 'Aspect']];
+const WEIGHTS = [['300', 'Light'], ['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold']];
+/** A style's value when it isn't set: a row size follows the general size it inherits (index 7). */
+function styleDefault(styles, key) {
+  const def = STYLE_INDEX[key];
+  if (!def) return undefined;
+  if (def[7]) {
+    const v = Number((styles || {})[def[7]]);
+    return Number.isFinite(v) && (styles || {})[def[7]] !== '' ? Math.round(v) : STYLE_INDEX[def[7]][4];
+  }
+  return def[4];
+}
 // Backgrounds and borders also offer "Transparent".
 const TRANSPARENT_KEYS = new Set(['card_background', 'card_border_color', 'box_background', 'divider_color', 'chip_background', 'chip_border_color', 'viz_border_color']);
 const DOT_POSITIONS = [['title', 'Right of the title'], ['right', 'Far right'], ['icon', 'Replace the header icon']];
@@ -358,9 +384,12 @@ function normalizeConfig(raw) {
       if (!def) { styles[k] = v; return; } // unknown (newer build): keep verbatim
       if (def[2] === 'size') {
         v = Number(v);
-        if (!Number.isFinite(v) || v === def[4]) return;
+        if (!Number.isFinite(v)) return;
         v = Math.round(Math.min(def[6], Math.max(def[5], v)));
-        if (v === def[4]) return;
+        if (v === styleDefault(c.styles, k)) return;
+      } else if (def[2] === 'weight') {
+        v = String(v).trim();
+        if (!WEIGHTS.some(([w]) => w === v) || v === def[4]) return;
       } else v = String(v).trim();
       if (v !== '') styles[k] = v;
     });
@@ -742,6 +771,14 @@ const CARD_CSS = `
 .lmg-note { margin-top: 8px; font-size: calc(var(--lmg-secondary-size, 12px) * var(--lmg-k, 1)); line-height: 1.5; color: var(--lmg-secondary-color, var(--secondary-text-color)); }
 .lmg-note.bad { color: var(--error-color, #f44336); }
 .lmg-hint { margin-top: 4px; font-size: calc(11px * var(--lmg-k, 1)); color: var(--secondary-text-color); text-align: center; }
+/* Status box rows (styles flow_*): each row's size, weight and color, in both boxes at once. Unset, a row
+   follows the general setting (Subtitles / Values / Details text). An empty top line keeps its height so
+   the rows of the two boxes stay level. */
+.lmg-chain .lmg-box-h { font-size: calc(var(--lmg-flow-name-size, var(--lmg-subtitle-size, 10px)) * var(--lmg-k, 1)); font-weight: var(--lmg-flow-name-weight, 400); color: var(--lmg-flow-name-color, var(--lmg-subtitle-color, var(--secondary-text-color))); }
+.lmg-chain .lmg-box-t { font-size: calc(var(--lmg-flow-row1-size, var(--lmg-text-size, 14px)) * var(--lmg-k, 1)); font-weight: var(--lmg-flow-row1-weight, 600); color: var(--lmg-flow-row1-color, var(--lmg-text-color, var(--primary-text-color))); }
+.lmg-chain .lmg-box-s:not(.lmg-ar) { font-size: calc(var(--lmg-flow-row2-size, var(--lmg-secondary-size, 12px)) * var(--lmg-k, 1)); font-weight: var(--lmg-flow-row2-weight, 400); color: var(--lmg-flow-row2-color, var(--lmg-secondary-color, var(--secondary-text-color))); }
+.lmg-chain .lmg-box-s.lmg-ar { font-size: calc(var(--lmg-flow-row3-size, var(--lmg-secondary-size, 12px)) * var(--lmg-k, 1)); font-weight: var(--lmg-flow-row3-weight, 600); color: var(--lmg-flow-row3-color, var(--lmg-ctx)); }
+.lmg-chain .lmg-box-h { min-height: 1.2em; line-height: 1.2; }
 /* Narrow cards (shrink_when_narrow): the whole card scales down, so nothing overflows on a phone or a
    narrow grid column. --lmg-k multiplies every size above; it is set on the card's children because a
    container query styles the container's descendants, not the container itself. */
@@ -865,7 +902,7 @@ class LumagenCard extends HTMLElement {
       chain: `
           <div class="lmg-status" data-sec="chain">
             <div class="lmg-chain">
-              <div class="lmg-box" data-item="box-src"><div class="lmg-box-h" data-k="s_h">Source</div><div class="lmg-box-t" data-k="s_t"></div><div class="lmg-box-s" data-k="s_1"></div><div class="lmg-box-s lmg-ar" data-k="s_ar"></div></div>
+              <div class="lmg-box" data-item="box-src"><div class="lmg-box-h" data-k="s_h"></div><div class="lmg-box-t" data-k="s_t"></div><div class="lmg-box-s" data-k="s_1"></div><div class="lmg-box-s lmg-ar" data-k="s_ar"></div></div>
               <div class="lmg-link"><div class="lmg-link-l" data-item="proc" data-k="proc"></div><ha-icon class="lmg-arrow" icon="mdi:arrow-right"></ha-icon></div>
               <div class="lmg-box" data-item="box-disp"><div class="lmg-box-h">${esc(cfg(c, 'display_name'))}</div><div class="lmg-box-t" data-k="d_t"></div><div class="lmg-box-s" data-k="d_1"></div><div class="lmg-box-s lmg-ar" data-k="d_ar"></div></div>
             </div>
@@ -1220,7 +1257,7 @@ class LumagenCard extends HTMLElement {
 
     // signal chain: Source → (what the Lumagen does, on the arrow) → Display, then the Lumagen's settings
     const lbl = okState(v('input_label')) ? v('input_label') : okState(v('logical_input')) ? `Input ${v('logical_input')}` : '';
-    set('s_h', lbl ? `Source · ${lbl}` : 'Source');
+    set('s_h', lbl); // the boxes' places say source and display: the top line names only the input
     const srcVideo = fmtVideo(v('src_res'), v('src_mode'), v('src_rate'));
     set('s_t', srcVideo);
     const nits = v('src_dr') === 'HDR' && okState(v('hdr_max')) ? ` · ${Math.round(Number(v('hdr_max')))} nits` : '';
@@ -1644,6 +1681,22 @@ class LumagenCardEditor extends HTMLElement {
       ${field}</div></div>`;
   }
 
+  /** One Appearance control for a STYLE_DEFS entry. */
+  _styleControl([key, , kind, label, def, min, max], st) {
+    if (kind === 'size') return this._slider(key, label, st[key] !== undefined ? st[key] : styleDefault(st, key), min, max, 1, 'styles');
+    if (kind === 'weight') return this._weightControl(key, label, def);
+    return this._colorControl(key, label, def, '#2196f3', 'styles');
+  }
+
+  /** Font weight select (styles): '' = the row's default. */
+  _weightControl(key, label, def) {
+    const cur = this._get(key, 'styles') || '';
+    const name = (WEIGHTS.find(([w]) => w === def) || [, def])[1];
+    return `<div class="lmge-row"><label class="lbl">${label}</label><select data-wkey="${key}">
+      <option value=""${cur ? '' : ' selected'}>Default (${name})</option>
+      ${WEIGHTS.map(([w, n]) => `<option value="${w}"${w === cur ? ' selected' : ''}>${n}</option>`).join('')}</select></div>`;
+  }
+
   _slider(key, label, value, min, max, step, scope = '', fmt = (n) => `${n}px`) {
     const isSet = this._get(key, scope) !== undefined;
     return `<div class="lmge-row lmge-nowrap"><label class="lbl">${label}</label>
@@ -1810,7 +1863,7 @@ class LumagenCardEditor extends HTMLElement {
       ${this._sectionList()}`;
     const screenBody = `
       <p class="lmge-hint">Your screen, for the visualizer and the third box of the signal chain. The visualizer crops and stretches a picture exactly as the Lumagen does with its current settings.</p>
-      <div class="lmge-row"><label class="lbl">Display name</label><input type="text" data-key="display_name" value="${esc(cfg(c, 'display_name'))}"></div>
+      <div class="lmge-row"><label class="lbl">Display name</label><input type="text" data-key="display_name" value="${esc(cfg(c, 'display_name'))}" placeholder="e.g. JVC NZ8 — empty: no name"></div>
       <div class="lmge-group">Screen shape</div>
       ${this._slider('display_aspect', 'Aspect', aspect, 1.33, 2.76, 0.01, '', (n) => Number(n).toFixed(2))}
       <div class="lmge-presets">${ASPECT_PRESETS.map((p) => `<button class="lmge-preset${Math.abs(p - aspect) < 0.005 ? ' on' : ''}" data-preset="${p}">${p.toFixed(2)}</button>`).join('')}</div>
@@ -1831,9 +1884,9 @@ class LumagenCardEditor extends HTMLElement {
           <input type="text" data-icon="${k}" value="${esc(((c.icons || {})[k] || '').replace(/^mdi:/, ''))}" placeholder="${ICON_DEFAULTS[k].replace(/^mdi:/, '')}"></div>`).join('')}`;
     const looks = STYLE_GROUPS.map(([g, title, hint]) => this._sub(`look-${g}`, title, `
       <p class="lmge-hint">${hint}</p>
-      ${STYLE_DEFS.filter((d) => d[1] === g).map(([key, , kind, label, def, min, max]) => (kind === 'size'
-        ? this._slider(key, label, st[key] !== undefined ? st[key] : def, min, max, 1, 'styles')
-        : this._colorControl(key, label, def, '#2196f3', 'styles'))).join('')}`)).join('')
+      ${g === 'flow'
+        ? FLOW_ROWS.map(([rid, rlabel]) => `<div class="lmge-group">${rlabel}</div>${STYLE_DEFS.filter((d) => d[0].startsWith(`flow_${rid}_`)).map((d) => this._styleControl(d, st)).join('')}`).join('')
+        : STYLE_DEFS.filter((d) => d[1] === g).map((d) => this._styleControl(d, st)).join('')}`)).join('')
       + this._sub('look-context', 'Context colors', `
       <p class="lmge-hint">The card tints itself by context: the accent normally, the HDR color while HDR plays, the game color in game mode.</p>
       ${CONTEXT_COLORS.map(([k, l, d, seed]) => this._colorControl(k, l, d, seed)).join('')}`);
@@ -1872,8 +1925,7 @@ class LumagenCardEditor extends HTMLElement {
       el.addEventListener('change', () => {
         const n = Number(el.value);
         if (scope) {
-          const def = STYLE_INDEX[key];
-          this._set(key, def && n === def[4] ? '' : n, scope);
+          this._set(key, STYLE_INDEX[key] && n === styleDefault(this._config.styles, key) ? '' : n, scope);
         } else this._set(key, n);
         this._render();
       });
@@ -1937,6 +1989,10 @@ class LumagenCardEditor extends HTMLElement {
       this._emit();
       this._render();
     }));
+    this.querySelectorAll('[data-wkey]').forEach((sel) => sel.addEventListener('change', () => {
+      this._set(sel.dataset.wkey, sel.value, 'styles');
+      this._render();
+    }));
     this.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
       this._set(b.dataset.reset, '', b.dataset.scope);
       this._render();
@@ -1975,7 +2031,7 @@ class LumagenCardEditor extends HTMLElement {
 // Test hooks (pure helpers; no effect in the browser)
 LumagenCard._test = {
   BUILD_NUMBER, CARD_CSS, EDITOR_CSS, DEFAULTS, ENTITY_KEYS, OPTIONAL_ENTITIES, STYLE_DEFS, ICON_DEFAULTS, SCENE_URL,
-  WHEN_OFF, WIDE_FILL, STACK_MODES, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
+  WHEN_OFF, WIDE_FILL, STACK_MODES, FLOW_ROWS, WEIGHTS, styleDefault, SECTION_ITEMS, MERGE_TARGETS, mergeTarget, secLabel, normalizeConfig, normalizeIcon, normalizeOrder, SECTION_IDS, rootStyleVars, rootClasses, resolveEntities, listDevices, parseAspect, fitRect, vizGeometry, vizResult, nlsCropPct, fmtVideo, chipLabel, colorMode, lumagenProcessing, outputDynamicRange, STATUS_TAGS,
 };
 
 if (!customElements.get(CARD_TAG)) customElements.define(CARD_TAG, LumagenCard);

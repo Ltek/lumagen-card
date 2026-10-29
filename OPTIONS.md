@@ -40,7 +40,7 @@ pencil on each row for its name, settings and merge) · **Screen & visualizer** 
 
 | Key | Default | Description |
 |---|---|---|
-| `display_name` | `Display` | Heading of the Display box, e.g. your projector. |
+| `display_name` | | The top line of the Display box, e.g. your projector's name. Empty: no name (the box's place already says it is the display). |
 | `display_aspect` | `1.78` | Your screen's shape, e.g. `2.40` for a scope screen or `2.00`. |
 | `wide_fill` | `letterbox` | A picture wider than the screen (e.g. 2.40 on a 2.00 screen): `letterbox` (black bars top & bottom) or `zoom` (enlarged to fill the height, left & right cropped). Match how your Lumagen is set up — its zoom can't be read. Editor: Screen & visualizer → Visualizer. |
 | `nls_vertical` | `0` | Legacy. The Lumagen's NLS stretches only horizontally, so leave it at 0; any other value adds a top/bottom crop to the visualizer's NLS picture. Not in the editor unless set. |
@@ -98,6 +98,25 @@ Sizes are in px; colors take any CSS color or theme variable (e.g. `var(--accent
 - **Sizes:** `card_radius` `card_padding` `standby_indent` `header_icon_size` `title_size` `summary_size` `section_icon_size` `section_title_size` `subtitle_size` `text_size` `secondary_size` `chip_size` `icon_size` `viz_height` `caption_size` `viz_border_width`
 - **Colors:** `card_background` `card_border_color` `box_background` `divider_color` `header_icon_color` `title_color` `summary_color` `section_icon_color` `section_title_color` `subtitle_color` `text_color` `secondary_color` `chip_color` `chip_background` `chip_border_color` `icon_color` `caption_color` `viz_border_color`
 - `card_background`, `card_border_color`, `box_background`, `divider_color`, `chip_background`, `chip_border_color` and `viz_border_color` also accept `transparent`.
+
+### Status box rows
+
+Each row of the Source and Display boxes has its own size, weight and color, applied to both boxes at once (the rows hold the same kind of information). Rows: `name` (the input / display name), `row1` (resolution & rate), `row2` (dynamic range), `row3` (aspect).
+
+| Key | Description |
+|---|---|
+| `flow_<row>_size` | Size in px. Unset: follows `subtitle_size` (name), `text_size` (row 1) or `secondary_size` (rows 2 and 3). |
+| `flow_<row>_weight` | `300` light · `400` regular · `500` medium · `600` semibold · `700` bold. Unset: the row's own weight (row 1 semibold, row 3 semibold, the others regular). |
+| `flow_<row>_color` | Any CSS color or theme variable. Unset: follows the matching general color (row 3: the accent color). |
+
+Editor: Appearance → Signal chain rows. Example:
+
+```yaml
+styles:
+  flow_row1_size: 16
+  flow_row1_weight: '700'
+  flow_row2_color: var(--accent-color)
+```
 
 ---
 
