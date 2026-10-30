@@ -1,5 +1,9 @@
 # Changelog
 
+## v2026.10.30.21
+
+- **PREV key in the Remote** (under the down arrow): switches to the previous input, like PREV on the Lumagen remote. Can be hidden on its own (Sections → pencil on Remote → *Prev key*; `hidden_items: [remote.prev]`).
+
 ## v2026.10.29.20
 
 - **The status boxes drop the Source word: the Source box's top line names only the input (Apple TV). The Display box shows your `display_name`, which is now empty by default instead of "Display"; existing names stay.** The boxes' places already say which side is which.

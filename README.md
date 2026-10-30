@@ -4,7 +4,7 @@ A Home Assistant Dashboard card for the **Lumagen Radiance Pro**. See what comes
 does with it and what reaches your screen, watch a live picture of how your aspect settings crop and
 scale it, and reach every everyday control from one card, set up in a visual editor.
 
-Current build: **v2026.10.29.20** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
+Current build: **v2026.10.30.21** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
 
 ```
  ▣  Lumagen ●                                Apple TV · HDR · 2.40
@@ -73,7 +73,7 @@ HACS → **⋮ → Custom repositories** → `https://github.com/Ltek/lumagen-ca
 - The header icon is the power button: **tap to turn on, hold for standby**, so a stray tap can't end
   your movie. Keyboard and screen-reader users tap twice to confirm.
 - **Every control sits in a collapsed section**; each collapsed header shows the current value.
-- **Aspect** buttons, NLS and Reset auto aspect. **Remote** with menu keys and arrows; hold an arrow to
+- **Aspect** buttons, NLS and Reset auto aspect. **Remote** with menu keys, arrows and PREV (previous input); hold an arrow to
   repeat it 5×. **Source**: your input labels and memory A–D. **Picture**: CMS and Style by name.
 - **Admin & link** (hold to run): hotplug, restart outputs, reload config, OSD test, link health, and
   a list of integration entities you can still enable.

@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.29.20
+// Version: v2026.10.30.21
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.29.20';
+const BUILD_NUMBER = 'v2026.10.30.21';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -287,7 +287,7 @@ const SECTION_ITEMS = {
   visualizer: [['before', 'Source frame (before)', '[data-k="before"], .lmg-viz-arrow'], ['after', 'Screen (after)', '[data-item="viz-after"]']],
   hdr: [],
   aspects: [['chips', 'Aspect buttons', '[data-opts="aspect"]'], ['nls', 'NLS button', '[data-a="nls_btn"]'], ['reset', 'Reset auto button', '[data-a="reset_aa"]']],
-  remote: [['pad', 'Arrows and keys', '.lmg-pad'], ['hint', '"Hold an arrow" hint', '[data-item="remote-hint"]']],
+  remote: [['pad', 'Arrows and keys', '.lmg-pad'], ['prev', 'Prev key (previous input)', '[data-cmd="prev"]'], ['hint', '"Hold an arrow" hint', '[data-item="remote-hint"]']],
   source: [['inputs', 'Inputs', '[data-row="input"]', 'show_inputs'], ['memory', 'Memory', '[data-row="memory"]', 'show_memory']],
   picture: [['cms', 'CMS', '[data-row="cms"]'], ['style', 'Style', '[data-row="style"]']],
   admin: [['hotplug', 'Hotplug', '[data-a="hotplug"]'], ['restart', 'Restart outputs', '[data-a="restart"]'],
@@ -765,6 +765,7 @@ const CARD_CSS = `
   --mdc-icon-size: calc(var(--lmg-icon-size, 22px) * var(--lmg-k, 1)); }
 .lmg-key:hover { background: color-mix(in srgb, var(--lmg-ctx) 20%, transparent); }
 .lmg-key.ok { background: color-mix(in srgb, var(--lmg-ctx) 30%, transparent); color: var(--lmg-ctx); }
+.lmg-key.prev { grid-column: 2; } /* PREV (previous input) sits under the down arrow */
 .lmg-key.sm { color: var(--lmg-chip-color, var(--secondary-text-color)); }
 .lmg-admin { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin-top: 6px; }
 .lmg-admin .lmg-chip { text-align: center; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; padding-inline: calc(4px * var(--lmg-k, 1)); }
@@ -949,6 +950,7 @@ class LumagenCard extends HTMLElement {
               ${key('menu', 'Menu', 'sm')}${key('up', '<ha-icon icon="mdi:chevron-up"></ha-icon>', '', 1)}${key('exit', 'Exit', 'sm')}
               ${key('left', '<ha-icon icon="mdi:chevron-left"></ha-icon>', '', 1)}${key('ok', 'OK', 'ok')}${key('right', '<ha-icon icon="mdi:chevron-right"></ha-icon>', '', 1)}
               ${key('clear', 'Clear', 'sm')}${key('down', '<ha-icon icon="mdi:chevron-down"></ha-icon>', '', 1)}${key('help', 'Help', 'sm')}
+              ${key('prev', 'Prev', 'sm prev')}
             </div>
             <div class="lmg-hint" data-item="remote-hint">Hold an arrow to repeat it 5×</div></div>`),
       source: fold('source', 'source', 'Source', `
