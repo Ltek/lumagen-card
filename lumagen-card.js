@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.30.22
+// Version: v2026.10.30.23
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.30.22';
+const BUILD_NUMBER = 'v2026.10.30.23';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -151,7 +151,7 @@ const SECTIONS = [
   ['remote', 'Remote', 'icon:remote', ['show_remote']],
   ['source', 'Source', 'icon:source', ['show_source']],
   ['picture', 'Picture (CMS & Style)', 'icon:picture', ['show_picture']],
-  ['admin', 'Admin & link', 'icon:admin', ['show_admin']],
+  ['admin', 'Admin', 'icon:admin', ['show_admin']],
 ];
 const SECTION_IDS = SECTIONS.map((x) => x[0]);
 
@@ -176,7 +176,7 @@ const ICON_DEFAULTS = {
   admin: 'mdi:tools',
 };
 const ICON_LABELS = {
-  header: 'Header (power button)', aspect: 'Aspect', remote: 'Remote', source: 'Source', picture: 'Picture', admin: 'Admin & link',
+  header: 'Header (power button)', aspect: 'Aspect', remote: 'Remote', source: 'Source', picture: 'Picture', admin: 'Admin',
 };
 
 /** 'movie' → 'mdi:movie'; 'hass:x' / 'mdi:x' kept; '' → ''. */
@@ -993,7 +993,7 @@ class LumagenCard extends HTMLElement {
               <div class="lmg-row" data-row="cms"><div class="lmg-row-l">CMS</div><div class="lmg-opts" data-opts="cms"></div></div>
               <div class="lmg-row" data-row="style"><div class="lmg-row-l">Style</div><div class="lmg-opts" data-opts="style"></div></div>
             </div>`),
-      admin: fold('admin', 'admin', 'Admin & link', `
+      admin: fold('admin', 'admin', 'Admin', `
             <div class="lmg-admin">
               ${admin('save', 'Save settings')}${admin('hotplug', 'Hotplug all')}${admin('hotplug_cur', 'Hotplug this input')}
               ${admin('restart', 'Restart outputs')}${admin('reload', 'Reload config')}${admin('osd_test', 'OSD test')}
@@ -1794,6 +1794,17 @@ class LumagenCardEditor extends HTMLElement {
     </div>`;
   }
 
+  /** Eye rows for some of a section's settings (same controls as its pencil panel). */
+  _itemEyes(sec, ids) {
+    const c = this._config;
+    const hidden = new Set(c.hidden_items || []);
+    return `<div class="lmge-blist">${ids.map((iid) => (SECTION_ITEMS[sec] || []).find((i) => i[0] === iid)).filter(Boolean).map(([iid, label, , key]) => {
+      const on = key ? !!cfg(c, key) : !hidden.has(`${sec}.${iid}`);
+      const attr = key ? `data-eye="${key}"` : `data-item-eye="${sec}.${iid}"`;
+      return `<div class="lmge-brow${on ? '' : ' off'}"><span class="lmge-sname">${esc(label)}</span>${eyeToggle('', on, '', ' ' + attr).replace(' data-eye=""', '')}</div>`;
+    }).join('')}</div>`;
+  }
+
   /** Section-specific options shown in its edit panel. */
   _secOptions(id) {
     const c = this._config;
@@ -1827,7 +1838,7 @@ class LumagenCardEditor extends HTMLElement {
       const shown = cfg(c, keys[0]);
       return `<div class="lmge-srow${shown ? '' : ' off'}" data-sid="${id}">
         <ha-icon class="lmge-sicon" icon="${esc(ic)}"></ha-icon>
-        <span class="lmge-sname">${esc(secLabel(c, id))}</span>${this._secMergeTag(id)}
+        <span class="lmge-sname">${esc(secLabel(c, id))}</span>${this._secMergeTag(id)}${id === 'remote' ? `<span class="lmge-sctl">${eyeToggle('show_numpad', !!cfg(c, 'show_numpad'), 'Number pad')}</span>` : ''}
         <button class="lmge-act" data-move="-1" data-sid="${id}" title="Move up"${i === 0 ? ' disabled' : ''}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
         <button class="lmge-act" data-move="1" data-sid="${id}" title="Move down"${i === order.length - 1 ? ' disabled' : ''}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
         ${eyeToggle(keys[0], shown)}
@@ -1859,7 +1870,8 @@ class LumagenCardEditor extends HTMLElement {
     return `<p class="lmge-hint">Use the eye to hide a button from the card. The lists come from your Lumagen (labels) and the integration's aspect ratio menu.</p>
       ${group('Aspect', 'hide_aspects', (o) => o)}
       ${group('Input', 'hide_inputs', (o) => chipLabel(o))}
-      ${group('Memory', 'hide_memory', (o) => String(o).replace(/^MEM/, 'Memory '))}`;
+      ${group('Memory', 'hide_memory', (o) => String(o).replace(/^MEM/, 'Memory '))}
+      ${this._sub('btn-remote', 'Remote keys', this._itemEyes('remote', ['prev', 'numpad', 'fn', ...FN_KEYS.map(([cmd]) => `fn_${cmd}`)]))}`;
   }
 
   _render() {

@@ -1,5 +1,10 @@
 # Changelog
 
+## v2026.10.30.23
+
+- **The number pad is easy to turn on:** a *Number pad* eye on the Remote row in **Sections**, and a new **Remote keys** group in **Buttons** (number pad, Prev, the function-key row and each function key). It was only in the Remote section's pencil panel.
+- **"Admin & link" is now "Admin"** (card, Sections and Icons). A name you gave the section yourself is kept.
+
 ## v2026.10.30.22
 
 Every Lumagen button the integration supports is now on the card; each one can be hidden on its own (Sections → pencil on its section).
