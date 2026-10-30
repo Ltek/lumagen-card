@@ -1,5 +1,5 @@
 {
-    "name": "Lumagen Radiance Pro (Ltek) card",
+    "name": "Lumagen Radiance Pro Card (Ltek)",
     "filename": "lumagen-card.js",
     "render_readme": true,
     "homeassistant": "2024.8.0",
