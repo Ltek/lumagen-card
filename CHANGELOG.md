@@ -1,5 +1,15 @@
 # Changelog
 
+## v2026.10.30.22
+
+Every Lumagen button the integration supports is now on the card; each one can be hidden on its own (Sections → pencil on its section).
+
+- **Remote → function keys:** Input (opens the input menu), ALT, Zone, HDR setup, Pattern, Save menu. **ALT moved here from Admin** — it is a modifier pressed before another key, so it is now a plain tap. A hidden Admin ALT stays hidden.
+- **Remote → number pad** 0–9 and 10+, for entering numbers in Lumagen menus. Hidden by default; turn it on with its eye (Sections → pencil on Remote; `show_numpad: true`).
+- **Aspect → Auto aspect** on/off toggle (filled while on). Before, picking a ratio was the only way to turn auto aspect off.
+- **Admin → Save settings** (hold): saves the Lumagen's settings to flash, so CMS / Style picked on the card survive a power cycle. Needs the lumagen integration v2026.10.30.2 (its new *Save Config* button); hidden until it exists.
+- **Admin → Hotplug input N** (hold): re-reads the EDID of the input in use only. The existing button is now **Hotplug all**.
+
 ## v2026.10.30.21
 
 - **PREV key in the Remote** (under the down arrow): switches to the previous input, like PREV on the Lumagen remote. Can be hidden on its own (Sections → pencil on Remote → *Prev key*; `hidden_items: [remote.prev]`).

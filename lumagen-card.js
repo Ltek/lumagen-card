@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.30.21
+// Version: v2026.10.30.22
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.30.21';
+const BUILD_NUMBER = 'v2026.10.30.22';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -30,6 +30,8 @@ const ENTITY_KEYS = {
   style: ['select', 'style', 'style'],
   nls_btn: ['button', 'nls', 'nls'],
   reset_aa: ['button', 'reset_auto_aspect', 'reset_auto_aspect'],
+  save_cfg: ['button', 'save_config', 'save_config'],
+  phys_input: ['sensor', 'physical_input', 'physical_input'],
   restart: ['button', 'restart_outputs', 'restart_outputs'],
   reload: ['button', 'reload_config', 'reload_config'],
   connected: ['binary_sensor', 'connected', 'connected'],
@@ -133,6 +135,7 @@ const DEFAULTS = {
   show_memory: true,
   show_picture: true,
   show_admin: true,
+  show_numpad: false, // Remote number pad (0-9, 10+) for entering numbers in Lumagen menus
   shrink_when_narrow: true,
   stack_when_narrow: 'auto', // status boxes on a narrow card: auto (stack under 260 px) | always | never
   accent_color: '',
@@ -277,6 +280,15 @@ const STATUS_TAGS = [['link', 'LINK DOWN'], ['hdr', 'HDR'], ['game', 'GAME'], ['
 // ---------------------------------------------------------------------------
 // Section editing (editor: pencil on a section row): rename, hide single settings, merge.
 // ---------------------------------------------------------------------------
+// Remote function keys: [remote command, label, short label, what it does].
+const FN_KEYS = [
+  ['input', 'Input', 'Input', 'opens the input menu'],
+  ['alt', 'ALT', 'ALT', 'alternate use of the next key'],
+  ['zone', 'Zone', 'Zone', 'output zone select'],
+  ['hdr_setup', 'HDR setup', 'HDR setup', 'opens the HDR menu'],
+  ['pattern', 'Pattern', 'Pattern', 'opens the test patterns'],
+  ['save', 'Save menu', 'Save menu', 'opens the save menu'],
+];
 // Per-section settings the user can hide: [id, label, selector, existing show key?]. A setting with
 // a show key is the card's own option (its eye toggles that key); the rest use hidden_items.
 const SECTION_ITEMS = {
@@ -286,13 +298,19 @@ const SECTION_ITEMS = {
     ...STATUS_TAGS.map(([id, label]) => [`tag_${id}`, `Tag: ${label}`, `[data-tag="${id}"]`])],
   visualizer: [['before', 'Source frame (before)', '[data-k="before"], .lmg-viz-arrow'], ['after', 'Screen (after)', '[data-item="viz-after"]']],
   hdr: [],
-  aspects: [['chips', 'Aspect buttons', '[data-opts="aspect"]'], ['nls', 'NLS button', '[data-a="nls_btn"]'], ['reset', 'Reset auto button', '[data-a="reset_aa"]']],
-  remote: [['pad', 'Arrows and keys', '.lmg-pad'], ['prev', 'Prev key (previous input)', '[data-cmd="prev"]'], ['hint', '"Hold an arrow" hint', '[data-item="remote-hint"]']],
+  aspects: [['chips', 'Aspect buttons', '[data-opts="aspect"]'], ['nls', 'NLS button', '[data-a="nls_btn"]'], ['reset', 'Reset auto button', '[data-a="reset_aa"]'],
+    ['auto', 'Auto aspect on/off', '[data-a="auto_aa"]']],
+  remote: [['pad', 'Arrows and keys', '[data-item="remote-pad"]'], ['prev', 'Prev key (previous input)', '[data-cmd="prev"]'],
+    ['fn', 'Function keys (all)', '[data-item="remote-fn"]'],
+    ...FN_KEYS.map(([cmd, label, , tip]) => [`fn_${cmd}`, `Key: ${label} (${tip})`, `[data-item="remote-fn"] [data-cmd="${cmd}"]`]),
+    ['numpad', 'Number pad (0–9, 10+)', '[data-item="numpad"]', 'show_numpad'],
+    ['hint', '"Hold an arrow" hint', '[data-item="remote-hint"]']],
   source: [['inputs', 'Inputs', '[data-row="input"]', 'show_inputs'], ['memory', 'Memory', '[data-row="memory"]', 'show_memory']],
   picture: [['cms', 'CMS', '[data-row="cms"]'], ['style', 'Style', '[data-row="style"]']],
-  admin: [['hotplug', 'Hotplug', '[data-a="hotplug"]'], ['restart', 'Restart outputs', '[data-a="restart"]'],
+  admin: [['save', 'Save settings', '[data-a="save"]'], ['hotplug', 'Hotplug all', '[data-a="hotplug"]'],
+    ['hotplug_cur', 'Hotplug this input', '[data-a="hotplug_cur"]'], ['restart', 'Restart outputs', '[data-a="restart"]'],
     ['reload', 'Reload config', '[data-a="reload"]'], ['osd_test', 'OSD test', '[data-a="osd_test"]'], ['osd_clear', 'Clear OSD', '[data-a="osd_clear"]'],
-    ['alt', 'ALT', '[data-a="alt"]'], ['hint', '"Hold a button" hint', '[data-item="admin-hint"]'],
+    ['hint', '"Hold a button" hint', '[data-item="admin-hint"]'],
     ['link', 'Link note', '[data-k="link"]'], ['missing', 'Disabled-entities note', '[data-k="missing"]']],
 };
 // Sections other sections can be merged into, and sections that can't be merged anywhere.
@@ -333,7 +351,7 @@ function normalizeSectionEdits(c, out) {
   }
   const ok = new Set(Object.entries(SECTION_ITEMS).flatMap(([sec, items]) => items.filter((i) => !i[3]).map((i) => `${sec}.${i[0]}`)));
   const hidden = [];
-  (Array.isArray(c.hidden_items) ? c.hidden_items : []).forEach((x) => { const v = String(x).trim(); if (ok.has(v) && !hidden.includes(v)) hidden.push(v); });
+  (Array.isArray(c.hidden_items) ? c.hidden_items : []).forEach((x) => { let v = String(x).trim(); if (v === 'admin.alt') v = 'remote.fn_alt'; /* ALT moved to the Remote */ if (ok.has(v) && !hidden.includes(v)) hidden.push(v); });
   if (hidden.length) out.hidden_items = hidden;
   if (c.section_merge && typeof c.section_merge === 'object') {
     const m = {};
@@ -755,6 +773,7 @@ const CARD_CSS = `
 .lmg-chip:hover { border-color: var(--lmg-ctx); }
 .lmg-chip.on { background: var(--lmg-ctx); border-color: var(--lmg-ctx); color: #fff; }
 .lmg-chip.act { border-style: dashed; color: var(--lmg-ctx); }
+.lmg-chip.act.on { border-style: solid; color: #fff; } /* an active toggle chip (Auto aspect) */
 .lmg-armed { outline: 2px dashed var(--lmg-ctx); outline-offset: 2px; }
 .lmg-held { outline: 2px solid var(--lmg-ctx); outline-offset: 1px; }
 .lmg.is-off .lmg-ctl, .lmg.is-down .lmg-ctl { opacity: .45; pointer-events: none; }
@@ -766,6 +785,10 @@ const CARD_CSS = `
 .lmg-key:hover { background: color-mix(in srgb, var(--lmg-ctx) 20%, transparent); }
 .lmg-key.ok { background: color-mix(in srgb, var(--lmg-ctx) 30%, transparent); color: var(--lmg-ctx); }
 .lmg-key.prev { grid-column: 2; } /* PREV (previous input) sits under the down arrow */
+.lmg-pad.lmg-fn { grid-auto-rows: calc(36px * var(--lmg-k, 1)); margin-top: 10px; }
+.lmg-fn .lmg-key { white-space: normal; line-height: 1.1; text-align: center; padding: 0 2px; }
+.lmg-pad.lmg-num { margin-top: 10px; }
+.lmg-key.zero { grid-column: 2; }
 .lmg-key.sm { color: var(--lmg-chip-color, var(--secondary-text-color)); }
 .lmg-admin { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin-top: 6px; }
 .lmg-admin .lmg-chip { text-align: center; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; padding-inline: calc(4px * var(--lmg-k, 1)); }
@@ -891,8 +914,8 @@ class LumagenCard extends HTMLElement {
           <span class="lmg-peek" data-peek="${sec}"></span><ha-icon class="lmg-chev" icon="mdi:chevron-right"></ha-icon></summary>
         ${body}
       </details>`;
-    const key = (cmd, inner, cls = '', hold = '') =>
-      `<button class="lmg-key ${cls}" data-tap="remote" data-cmd="${cmd}"${hold ? ' data-hold="remote-repeat"' : ''} aria-label="${cmd}">${inner}</button>`;
+    const key = (cmd, inner, cls = '', hold = '', tip = '') =>
+      `<button class="lmg-key ${cls}" data-tap="remote" data-cmd="${cmd}"${hold ? ' data-hold="remote-repeat"' : ''} aria-label="${esc(tip || cmd)}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</button>`;
     const admin = (id, label) => `<button class="lmg-chip" data-hold="${id}" data-a="${id}">${label}</button>`;
     const afterOnly = cfg(c, 'viz_after_only');
     const standbyText = esc(cfg(c, 'standby_message') || `Standby · ${cfg(c, 'power_hold_on') ? 'hold' : 'tap'} the icon to power on`);
@@ -944,13 +967,20 @@ class LumagenCard extends HTMLElement {
               <span class="lmg-opts" data-opts="aspect"></span>
               <button class="lmg-chip act" data-tap="nls" data-a="nls_btn">NLS</button>
               <button class="lmg-chip act" data-tap="reset_aa" data-a="reset_aa">Reset auto</button>
+              <button class="lmg-chip act" data-tap="auto_aa" data-a="auto_aa" title="Turn automatic aspect detection on or off">Auto aspect</button>
             </div></div></div>`),
       remote: fold('remote', 'remote', 'Remote', `
-            <div class="lmg-ctl"><div class="lmg-pad">
+            <div class="lmg-ctl"><div class="lmg-pad" data-item="remote-pad">
               ${key('menu', 'Menu', 'sm')}${key('up', '<ha-icon icon="mdi:chevron-up"></ha-icon>', '', 1)}${key('exit', 'Exit', 'sm')}
               ${key('left', '<ha-icon icon="mdi:chevron-left"></ha-icon>', '', 1)}${key('ok', 'OK', 'ok')}${key('right', '<ha-icon icon="mdi:chevron-right"></ha-icon>', '', 1)}
               ${key('clear', 'Clear', 'sm')}${key('down', '<ha-icon icon="mdi:chevron-down"></ha-icon>', '', 1)}${key('help', 'Help', 'sm')}
               ${key('prev', 'Prev', 'sm prev')}
+            </div>
+            <div class="lmg-pad lmg-fn" data-item="remote-fn">
+              ${FN_KEYS.map(([cmd, , short, tip]) => key(cmd, short, 'sm', '', `${short}: ${tip}`)).join('')}
+            </div>
+            <div class="lmg-pad lmg-num" data-item="numpad">
+              ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => key(String(n), String(n))).join('')}${key('10+', '10+', 'sm', '', 'Add 10 to the next digit')}${key('0', '0')}
             </div>
             <div class="lmg-hint" data-item="remote-hint">Hold an arrow to repeat it 5×</div></div>`),
       source: fold('source', 'source', 'Source', `
@@ -965,8 +995,9 @@ class LumagenCard extends HTMLElement {
             </div>`),
       admin: fold('admin', 'admin', 'Admin & link', `
             <div class="lmg-admin">
-              ${admin('hotplug', 'Hotplug')}${admin('restart', 'Restart outputs')}${admin('reload', 'Reload config')}
-              ${admin('osd_test', 'OSD test')}${admin('osd_clear', 'Clear OSD')}${admin('alt', 'ALT')}
+              ${admin('save', 'Save settings')}${admin('hotplug', 'Hotplug all')}${admin('hotplug_cur', 'Hotplug this input')}
+              ${admin('restart', 'Restart outputs')}${admin('reload', 'Reload config')}${admin('osd_test', 'OSD test')}
+              ${admin('osd_clear', 'Clear OSD')}
             </div>
             <div class="lmg-hint" data-item="admin-hint">Hold a button to run it</div>
             <div class="lmg-note" data-k="link"></div>
@@ -1107,9 +1138,25 @@ class LumagenCard extends HTMLElement {
       case 'hotplug': if (remote) this._call('lumagen', 'hotplug', { entity_id: remote }); break;
       case 'osd_test': if (remote) this._call('lumagen', 'show_osd_volume', { entity_id: remote, value: 42 }); break;
       case 'osd_clear': if (remote) this._call('lumagen', 'clear_osd_message', { entity_id: remote }); break;
-      case 'alt': if (remote) this._call('remote', 'send_command', { entity_id: remote, command: 'alt' }); break;
+      case 'save': press('save_cfg'); this._toast('Lumagen settings saved'); break;
+      case 'hotplug_cur': {
+        const n = this._physInput();
+        if (remote && n) this._call('lumagen', 'hotplug', { entity_id: remote, input: n });
+        break;
+      }
+      case 'auto_aa':
+        if (E.auto_aspect) this._call('switch', 'toggle', { entity_id: E.auto_aspect });
+        break;
       default: break;
     }
+  }
+
+  /** Physical HDMI input now in use (1-8, the range hotplug accepts), or 0. */
+  _physInput() {
+    const E = this._ents || {};
+    const s = this._hass && E.phys_input && this._hass.states[E.phys_input];
+    const n = s ? Number(s.state) : NaN;
+    return Number.isInteger(n) && n >= 1 && n <= 8 ? n : 0;
   }
 
   _isOn() {
@@ -1322,10 +1369,17 @@ class LumagenCard extends HTMLElement {
         nls_btn: !!E.nls_btn && !hiddenSet(c, 'hide_aspects').has('"nls"'),
         reset_aa: !!E.reset_aa && !hiddenSet(c, 'hide_aspects').has('"reset"'), restart: !!E.restart, reload: !!E.reload,
         hotplug: !!E.remote && svc('hotplug'), osd_test: !!E.remote && svc('show_osd_volume'),
-        osd_clear: !!E.remote && svc('clear_osd_message'), alt: !!E.remote,
+        osd_clear: !!E.remote && svc('clear_osd_message'),
+        save: !!E.save_cfg, hotplug_cur: !!E.remote && svc('hotplug') && !!this._physInput(), auto_aa: !!E.auto_aspect,
       }[b.dataset.a];
       b.hidden = !avail;
     });
+    const aa = this.querySelector('[data-a="auto_aa"]');
+    if (aa) aa.classList.toggle('on', v('auto_aspect') === 'on');
+    const hc = this.querySelector('[data-a="hotplug_cur"]');
+    if (hc) { const t = this._physInput() ? `Hotplug input ${this._physInput()}` : 'Hotplug this input'; if (hc.textContent !== t) hc.textContent = t; }
+    const np = this.querySelector('[data-item="numpad"]');
+    if (np) np.hidden = !cfg(c, 'show_numpad');
 
     // section peeks: current value shown on the collapsed header
     const peek = (sec, text) => {
