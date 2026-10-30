@@ -1,5 +1,9 @@
 # Changelog
 
+## v2026.10.30.24
+
+- **Named "Lumagen Radiance Pro Card (Ltek)" in Home Assistant's *Add card* picker**, matching its HACS name, so searching "Ltek" finds it. The card type is unchanged, so existing dashboards are not affected.
+
 ## v2026.10.30.23
 
 - **The number pad is easy to turn on:** a *Number pad* eye on the Remote row in **Sections**, and a new **Remote keys** group in **Buttons** (number pad, Prev, the function-key row and each function key). It was only in the Remote section's pencil panel.

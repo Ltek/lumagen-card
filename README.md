@@ -4,7 +4,7 @@ A Home Assistant Dashboard card for the **Lumagen Radiance Pro**. See what comes
 does with it and what reaches your screen, watch a live picture of how your aspect settings crop and
 scale it, and reach every everyday control from one card, set up in a visual editor.
 
-Current build: **v2026.10.30.23** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
+Current build: **v2026.10.30.24** · full history in [CHANGELOG.md](CHANGELOG.md) · every YAML option in [OPTIONS.md](OPTIONS.md)
 
 ```
  ▣  Lumagen ●                                Apple TV · HDR · 2.40

@@ -1,5 +1,5 @@
 // Lumagen Card — Home Assistant Dashboard card for the Lumagen Radiance Pro
-// Version: v2026.10.30.23
+// Version: v2026.10.30.24
 //
 // Read-only status on top (signal chain, tags, an aspect visualizer that crops and
 // stretches a real picture exactly like the Lumagen does, HDR details); every
@@ -12,7 +12,7 @@
 // card root. Entities are found by the integration's translation keys, so renamed
 // entity IDs keep working; disabled entities simply don't appear.
 
-const BUILD_NUMBER = 'v2026.10.30.23';
+const BUILD_NUMBER = 'v2026.10.30.24';
 const CARD_TAG = 'lumagen-card';
 const EDITOR_TAG = 'lumagen-card-editor';
 
@@ -2109,7 +2109,7 @@ window.customCards = window.customCards || [];
 if (!window.customCards.some((c) => c.type === CARD_TAG)) {
   window.customCards.push({
     type: CARD_TAG,
-    name: 'Lumagen Card',
+    name: 'Lumagen Radiance Pro Card (Ltek)',
     description: 'Lumagen Radiance Pro: signal chain, aspect visualizer, HDR details, and collapsible aspect, remote, source, picture and admin controls.',
     preview: false,
     documentationURL: 'https://github.com/Ltek/lumagen-card',
